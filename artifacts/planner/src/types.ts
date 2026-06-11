@@ -1,22 +1,28 @@
-export interface Task {
-  id: string;            // uuid
+export type EventStatus = "overdue" | "confirmed" | "pending";
+
+export interface Entity {
+  id: string;
   name: string;
-  color: string;         // hex color
-  startDate: string;     // "YYYY-MM-DD"
-  endDate: string;       // "YYYY-MM-DD"
-  category: "work" | "personal" | "health" | "study" | "other";
-  priority: "low" | "medium" | "high";
-  notes?: string;
-  createdAt: string;
 }
 
-export const TASK_COLORS = [
-  "#6366f1", // indigo
-  "#f59e0b", // amber
-  "#10b981", // emerald
-  "#ef4444", // red
-  "#3b82f6", // blue
-  "#8b5cf6", // violet
-  "#f97316", // orange
-  "#ec4899"  // pink
-];
+export interface PlannerEvent {
+  id: string;
+  entityId: string;
+  date: string; // YYYY-MM-DD
+  status: EventStatus;
+  title: string;
+  assignee: string;
+  notes?: string;
+}
+
+export const STATUS_COLORS: Record<EventStatus, string> = {
+  overdue: "#ef4444",
+  confirmed: "#22c55e",
+  pending: "#f97316",
+};
+
+export const STATUS_LABELS: Record<EventStatus, string> = {
+  overdue: "Просрочено",
+  confirmed: "Подтверждено",
+  pending: "Ожидание",
+};

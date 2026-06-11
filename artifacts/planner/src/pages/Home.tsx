@@ -1,475 +1,679 @@
-import React, { useState } from "react";
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, eachDayOfInterval, isWeekend, isToday, isSameDay, parseISO, isWithinInterval, differenceInDays } from "date-fns";
+import { useState, useRef, useEffect } from "react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  addMonths,
+  subMonths,
+  isToday,
+  isWeekend,
+  parseISO,
+} from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Briefcase, User, Heart, BookOpen, MoreHorizontal, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { useTasks } from "../hooks/use-tasks";
-import { Task, TASK_COLORS } from "../types";
-import { motion, AnimatePresence } from "framer-motion";
+import { ChevronLeft, ChevronRight, Plus, X, Check, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { usePlanner } from "../hooks/use-planner";
+import { Entity, PlannerEvent, EventStatus, STATUS_COLORS, STATUS_LABELS } from "../types";
 
 function generateId() {
-  return Math.random().toString(36).substring(2, 15);
+  return Math.random().toString(36).substring(2, 12);
 }
 
-const categoryIcons = {
-  work: <Briefcase className="w-4 h-4" />,
-  personal: <User className="w-4 h-4" />,
-  health: <Heart className="w-4 h-4" />,
-  study: <BookOpen className="w-4 h-4" />,
-  other: <MoreHorizontal className="w-4 h-4" />
+const DAY_ABBR: Record<number, string> = {
+  0: "ВС",
+  1: "ПН",
+  2: "ВТ",
+  3: "СР",
+  4: "ЧТ",
+  5: "ПТ",
+  6: "СБ",
 };
 
-const categoryLabels = {
-  work: "Работа",
-  personal: "Личное",
-  health: "Здоровье",
-  study: "Учёба",
-  other: "Другое"
-};
+const MONTH_NAMES = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+];
 
-const priorityLabels = {
-  low: "Низкий",
-  medium: "Средний",
-  high: "Высокий"
-};
-
-const priorityColors = {
-  low: "bg-blue-500/20 text-blue-400 border-blue-500/50",
-  medium: "bg-amber-500/20 text-amber-400 border-amber-500/50",
-  high: "bg-red-500/20 text-red-400 border-red-500/50"
-};
+type PopupState =
+  | { mode: "view"; event: PlannerEvent; entityId: string; date: string; cellRef: HTMLElement }
+  | { mode: "add"; entityId: string; date: string; cellRef: HTMLElement }
+  | { mode: "editEntity"; entity: Entity; cellRef: HTMLElement }
+  | null;
 
 export default function Home() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const { tasks, addTask, updateTask, deleteTask } = useTasks(currentMonth);
+  const [currentMonth, setCurrentMonth] = useState(() => new Date());
+  const {
+    entities, events,
+    addEntity, deleteEntity, renameEntity,
+    addEvent, updateEvent, deleteEvent,
+    getEventsForCell,
+  } = usePlanner(currentMonth);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [popup, setPopup] = useState<PopupState>(null);
+  const [addEntityName, setAddEntityName] = useState("");
+  const [showAddEntity, setShowAddEntity] = useState(false);
+  const addEntityRef = useRef<HTMLInputElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  const daysInMonth = eachDayOfInterval({
+  const days = eachDayOfInterval({
     start: startOfMonth(currentMonth),
-    end: endOfMonth(currentMonth)
+    end: endOfMonth(currentMonth),
   });
 
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const goToday = () => setCurrentMonth(new Date());
+  const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`;
 
-  const handleOpenModal = (task?: Task) => {
-    if (task) {
-      setEditingTask(task);
-    } else {
-      setEditingTask(null);
-    }
-    setIsModalOpen(true);
-  };
+  useEffect(() => {
+    if (showAddEntity) addEntityRef.current?.focus();
+  }, [showAddEntity]);
 
-  const handleSaveTask = (taskData: any) => {
-    if (editingTask) {
-      updateTask({ ...editingTask, ...taskData });
-    } else {
-      addTask({
-        id: generateId(),
-        createdAt: new Date().toISOString(),
-        ...taskData
-      });
-    }
-    setIsModalOpen(false);
-  };
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setPopup(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  const handleDeleteTask = () => {
-    if (editingTask) {
-      deleteTask(editingTask.id);
-      setIsModalOpen(false);
-    }
-  };
+  function openAddEvent(entityId: string, date: string, cell: HTMLElement) {
+    setPopup({ mode: "add", entityId, date, cellRef: cell });
+  }
 
-  // Stats
-  const totalTasks = tasks.length;
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-  const inProgressTasks = tasks.filter(t => t.startDate <= todayStr && t.endDate >= todayStr).length;
-  const completedTasks = tasks.filter(t => t.endDate < todayStr).length;
+  function openViewEvent(event: PlannerEvent, entityId: string, date: string, cell: HTMLElement) {
+    setPopup({ mode: "view", event, entityId, date, cellRef: cell });
+  }
+
+  function handleAddEntity() {
+    const name = addEntityName.trim();
+    if (!name) return;
+    addEntity({ id: generateId(), name });
+    setAddEntityName("");
+    setShowAddEntity(false);
+  }
+
+  function getPopupPosition() {
+    if (!popup || !popupRef.current || !('cellRef' in popup)) return {};
+    const cell = popup.cellRef;
+    const rect = cell.getBoundingClientRect();
+    const popupW = 280;
+    const popupH = 200;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let left = rect.left + rect.width / 2 - popupW / 2;
+    let top = rect.bottom + 8;
+
+    if (left + popupW > vw - 8) left = vw - popupW - 8;
+    if (left < 8) left = 8;
+    if (top + popupH > vh - 8) top = rect.top - popupH - 8;
+
+    return { position: "fixed" as const, left, top, zIndex: 50, width: popupW };
+  }
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground select-none">
       {/* Header */}
-      <header className="flex-none flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-20">
-        <div className="flex items-center gap-4">
-          <div className="bg-primary text-primary-foreground p-2 rounded-xl">
-            <CalendarDays className="w-5 h-5" />
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-primary">
+              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Планировщик</h1>
+          <span className="text-base font-semibold tracking-tight">Планировщик</span>
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={prevMonth}>
+          <button
+            data-testid="btn-prev-month"
+            onClick={() => setCurrentMonth(m => subMonths(m, 1))}
+            className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
             <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" onClick={goToday} className="min-w-[120px] font-medium">
-            {format(currentMonth, "LLLL yyyy", { locale: ru }).replace(/^[а-я]/, c => c.toUpperCase())}
-          </Button>
-          <Button variant="outline" size="icon" onClick={nextMonth}>
+          </button>
+          <span className="text-sm font-medium min-w-[140px] text-center">{monthLabel}</span>
+          <button
+            data-testid="btn-next-month"
+            onClick={() => setCurrentMonth(m => addMonths(m, 1))}
+            className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
             <ChevronRight className="w-4 h-4" />
-          </Button>
+          </button>
         </div>
 
-        <Button onClick={() => handleOpenModal()} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Добавить задачу
-        </Button>
-      </header>
+        <button
+          data-testid="btn-today"
+          onClick={() => setCurrentMonth(new Date())}
+          className="text-xs text-primary hover:underline"
+        >
+          Сегодня
+        </button>
+      </div>
 
-      {/* Main Grid Area */}
-      <main className="flex-1 overflow-auto relative flex flex-col">
-        <div className="min-w-max flex-1 flex flex-col">
-          {/* Days Header Row */}
-          <div className="sticky top-0 z-10 flex border-b border-border bg-background/95 backdrop-blur-md">
-            <div className="w-[280px] flex-shrink-0 border-r border-border bg-card/50 p-3 flex items-end">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Задачи</span>
-            </div>
-            <div className="flex flex-1">
-              {daysInMonth.map((day) => {
-                const isWknd = isWeekend(day);
-                const isTdy = isToday(day);
+      {/* Grid */}
+      <div ref={gridRef} className="flex-1 overflow-auto scrollbar-thin">
+        <table className="border-collapse" style={{ tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: 200, minWidth: 200 }} />
+            {days.map(d => (
+              <col key={d.toISOString()} style={{ width: 34, minWidth: 34 }} />
+            ))}
+            <col style={{ width: 48 }} />
+          </colgroup>
+
+          {/* Header rows */}
+          <thead className="sticky top-0 z-20">
+            {/* Day numbers */}
+            <tr>
+              <th className="bg-background border-b border-r border-border px-4 py-2 text-left">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Строка</span>
+              </th>
+              {days.map(day => {
+                const todayCell = isToday(day);
+                const weekend = isWeekend(day);
                 return (
-                  <div 
-                    key={day.toString()} 
-                    className={`flex-1 min-w-[40px] flex flex-col items-center justify-center py-2 border-r border-border/50 
-                      ${isWknd ? 'bg-muted/30' : ''} 
-                      ${isTdy ? 'bg-primary/10 border-primary/30' : ''}`}
+                  <th
+                    key={day.toISOString()}
+                    className={`border-b border-border py-2 text-center ${weekend ? "bg-background/50" : "bg-background"}`}
                   >
-                    <span className={`text-[10px] uppercase font-medium ${isTdy ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {format(day, "EEEEEE", { locale: ru })}
-                    </span>
-                    <span className={`text-sm font-semibold mt-0.5 ${isTdy ? 'text-primary' : 'text-foreground'}`}>
-                      {format(day, "d")}
-                    </span>
-                  </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span
+                        className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                          todayCell
+                            ? "bg-primary text-primary-foreground"
+                            : weekend
+                            ? "text-muted-foreground"
+                            : "text-foreground"
+                        }`}
+                      >
+                        {format(day, "d")}
+                      </span>
+                      <span className={`text-[9px] font-medium ${weekend ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                        {DAY_ABBR[day.getDay()]}
+                      </span>
+                    </div>
+                  </th>
                 );
               })}
-            </div>
-          </div>
+              <th className="bg-background border-b border-border" />
+            </tr>
+          </thead>
 
-          {/* Task Rows */}
-          <div className="flex-1 relative">
-            {/* Today highlight line */}
-            <div className="absolute inset-0 pointer-events-none flex" style={{ paddingLeft: 280 }}>
-               {daysInMonth.map((day, i) => (
-                  <div key={i} className={`flex-1 min-w-[40px] border-r border-border/20 ${isToday(day) ? 'bg-primary/5' : ''}`} />
-               ))}
-            </div>
+          <tbody>
+            {entities.length === 0 && (
+              <tr>
+                <td colSpan={days.length + 2} className="py-20 text-center text-muted-foreground text-sm">
+                  Нет строк. Добавьте первую строку ниже.
+                </td>
+              </tr>
+            )}
 
-            <div className="relative z-0">
-              <AnimatePresence>
-                {tasks.length === 0 ? (
-                  <div className="absolute inset-0 flex items-center justify-center p-12 text-center text-muted-foreground">
-                    <div>
-                      <CalendarDays className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                      <p className="text-lg font-medium">Нет задач в этом месяце</p>
-                      <p className="text-sm">Нажмите «Добавить задачу», чтобы начать планирование.</p>
-                    </div>
+            {entities.map((entity, rowIdx) => (
+              <EntityRow
+                key={entity.id}
+                entity={entity}
+                days={days}
+                rowIdx={rowIdx}
+                getEventsForCell={getEventsForCell}
+                onCellClick={openAddEvent}
+                onEventClick={openViewEvent}
+                onDeleteEntity={deleteEntity}
+                onRenameEntity={renameEntity}
+              />
+            ))}
+
+            {/* Add entity row */}
+            <tr>
+              <td className="border-t border-border/50 px-3 py-2" colSpan={days.length + 2}>
+                {showAddEntity ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={addEntityRef}
+                      data-testid="input-new-entity"
+                      value={addEntityName}
+                      onChange={e => setAddEntityName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") handleAddEntity();
+                        if (e.key === "Escape") setShowAddEntity(false);
+                      }}
+                      placeholder="Название строки..."
+                      className="text-sm bg-transparent border-b border-primary outline-none flex-1 py-0.5 text-foreground placeholder:text-muted-foreground"
+                    />
+                    <button onClick={handleAddEntity} className="text-xs text-primary hover:underline">
+                      Добавить
+                    </button>
+                    <button onClick={() => setShowAddEntity(false)} className="text-xs text-muted-foreground hover:text-foreground">
+                      Отмена
+                    </button>
                   </div>
                 ) : (
-                  tasks.map((task) => (
-                    <motion.div 
-                      layout
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      key={task.id} 
-                      className="flex border-b border-border/50 group hover:bg-muted/10 transition-colors"
-                    >
-                      {/* Task Info Cell */}
-                      <div 
-                        className="w-[280px] flex-shrink-0 border-r border-border/50 p-3 flex items-center gap-3 bg-card/20 cursor-pointer hover:bg-card/40 transition-colors relative overflow-hidden"
-                        onClick={() => handleOpenModal(task)}
-                      >
-                        {/* Progress background */}
-                        {(() => {
-                           const start = parseISO(task.startDate);
-                           const end = parseISO(task.endDate);
-                           const today = new Date();
-                           let progress = 0;
-                           if (today >= end) progress = 100;
-                           else if (today > start) {
-                             const totalDays = differenceInDays(end, start) + 1;
-                             const elapsed = differenceInDays(today, start) + 1;
-                             progress = Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
-                           }
-                           
-                           return (
-                             <div 
-                               className="absolute bottom-0 left-0 h-[2px] bg-primary/20" 
-                               style={{ width: '100%' }}
-                             >
-                                <div 
-                                  className="h-full bg-primary" 
-                                  style={{ width: `\${progress}%` }} 
-                                />
-                             </div>
-                           );
-                        })()}
-
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: task.color }} />
-                        
-                        <div className="flex-1 min-w-0 flex flex-col">
-                          <span className="text-sm font-medium truncate" title={task.name}>{task.name}</span>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              {categoryIcons[task.category]}
-                              <span className="truncate">{categoryLabels[task.category]}</span>
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className={`text-[10px] px-1.5 py-0.5 rounded border ${priorityColors[task.priority]}`}>
-                          {priorityLabels[task.priority][0]}
-                        </div>
-                      </div>
-
-                      {/* Task Timeline Cells */}
-                      <div className="flex flex-1 py-1 px-0 relative">
-                        {daysInMonth.map((day) => {
-                          const dateStr = format(day, "yyyy-MM-dd");
-                          const isStart = dateStr === task.startDate;
-                          const isEnd = dateStr === task.endDate;
-                          const isActive = dateStr >= task.startDate && dateStr <= task.endDate;
-                          
-                          return (
-                            <div 
-                              key={day.toString()} 
-                              className="flex-1 min-w-[40px] px-[1px] relative h-full flex items-center"
-                              onClick={() => handleOpenModal(task)}
-                            >
-                              {isActive && (
-                                <div 
-                                  className={`h-8 w-[calc(100%+2px)] absolute left-[-1px] top-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:brightness-110
-                                    ${isStart ? 'rounded-l-md ml-[1px] w-[calc(100%+1px)]' : ''} 
-                                    ${isEnd ? 'rounded-r-md mr-[1px] w-[calc(100%+1px)]' : ''}`}
-                                  style={{ 
-                                    backgroundColor: `\${task.color}33`, 
-                                    borderTop: `1px solid \${task.color}80`,
-                                    borderBottom: `1px solid \${task.color}80`,
-                                    borderLeft: isStart ? `1px solid \${task.color}80` : 'none',
-                                    borderRight: isEnd ? `1px solid \${task.color}80` : 'none'
-                                  }}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  ))
+                  <button
+                    data-testid="btn-add-entity"
+                    onClick={() => setShowAddEntity(true)}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Добавить строку
+                  </button>
                 )}
-              </AnimatePresence>
-            </div>
-            
-            {/* Empty clickable row to add task */}
-            <div 
-              className="flex border-b border-border/10 cursor-pointer hover:bg-muted/10 transition-colors h-14"
-              onClick={() => handleOpenModal()}
-            >
-              <div className="w-[280px] flex-shrink-0 border-r border-border/50 p-3 flex items-center gap-3 text-muted-foreground">
-                <Plus className="w-4 h-4" />
-                <span className="text-sm">Новая задача</span>
-              </div>
-              <div className="flex flex-1" />
-            </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
+      {/* Legend */}
+      <div className="flex items-center gap-6 px-6 py-3 border-t border-border flex-shrink-0">
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider mr-2">Статус:</span>
+        {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
+          <div key={s} className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: STATUS_COLORS[s] }} />
+            <span className="text-xs text-muted-foreground">{STATUS_LABELS[s]}</span>
           </div>
+        ))}
+        <div className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
+          <span>Всего строк: <strong className="text-foreground">{entities.length}</strong></span>
+          <span>Событий в месяце: <strong className="text-foreground">{events.length}</strong></span>
         </div>
-      </main>
+      </div>
 
-      {/* Footer / Stats */}
-      <footer className="flex-none border-t border-border bg-card px-6 py-3 flex items-center justify-between text-sm text-muted-foreground z-20">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-foreground">{totalTasks}</span> 
-            <span>Всего задач</span>
-          </div>
-          <div className="w-px h-4 bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-amber-500">{inProgressTasks}</span> 
-            <span>В процессе</span>
-          </div>
-          <div className="w-px h-4 bg-border" />
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-emerald-500">{completedTasks}</span> 
-            <span>Завершено</span>
-          </div>
+      {/* Popup */}
+      {popup && (
+        <div ref={popupRef} style={getPopupPosition()}>
+          {popup.mode === "view" && (
+            <ViewPopup
+              event={popup.event}
+              onClose={() => setPopup(null)}
+              onConfirm={() => {
+                updateEvent({ ...popup.event, status: "confirmed" });
+                setPopup(null);
+              }}
+              onPostpone={() => {
+                updateEvent({ ...popup.event, status: "pending" });
+                setPopup(null);
+              }}
+              onDelete={() => {
+                deleteEvent(popup.event.id);
+                setPopup(null);
+              }}
+              onEdit={(updated) => {
+                updateEvent(updated);
+                setPopup(null);
+              }}
+            />
+          )}
+          {popup.mode === "add" && (
+            <AddEventPopup
+              entityId={popup.entityId}
+              date={popup.date}
+              onClose={() => setPopup(null)}
+              onAdd={(event) => {
+                addEvent(event);
+                setPopup(null);
+              }}
+            />
+          )}
         </div>
-
-        <div className="flex items-center gap-4">
-          <span className="text-xs uppercase tracking-wider font-medium">Категории:</span>
-          {Object.entries(categoryLabels).map(([key, label]) => (
-            <div key={key} className="flex items-center gap-1.5 text-xs">
-              {categoryIcons[key as keyof typeof categoryIcons]}
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
-      </footer>
-
-      {/* Task Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{editingTask ? "Редактировать задачу" : "Новая задача"}</DialogTitle>
-          </DialogHeader>
-          <TaskForm 
-            task={editingTask} 
-            onSave={handleSaveTask} 
-            onDelete={handleDeleteTask}
-            defaultDate={format(currentMonth, "yyyy-MM-dd")}
-          />
-        </DialogContent>
-      </Dialog>
+      )}
     </div>
   );
 }
 
-// Form Component inline for simplicity
-function TaskForm({ task, onSave, onDelete, defaultDate }: { 
-  task: Task | null, 
-  onSave: (data: any) => void, 
-  onDelete: () => void,
-  defaultDate: string 
-}) {
-  const [name, setName] = useState(task?.name || "");
-  const [color, setColor] = useState(task?.color || TASK_COLORS[0]);
-  const [startDate, setStartDate] = useState(task?.startDate || defaultDate);
-  
-  // default end date is start date
-  const [endDate, setEndDate] = useState(task?.endDate || defaultDate);
-  const [category, setCategory] = useState<Task["category"]>(task?.category || "work");
-  const [priority, setPriority] = useState<Task["priority"]>(task?.priority || "medium");
-  const [notes, setNotes] = useState(task?.notes || "");
+/* ── Entity row ── */
+interface EntityRowProps {
+  entity: Entity;
+  days: Date[];
+  rowIdx: number;
+  getEventsForCell: (entityId: string, date: string) => PlannerEvent[];
+  onCellClick: (entityId: string, date: string, cell: HTMLElement) => void;
+  onEventClick: (event: PlannerEvent, entityId: string, date: string, cell: HTMLElement) => void;
+  onDeleteEntity: (id: string) => void;
+  onRenameEntity: (id: string, name: string) => void;
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    
-    // ensure end date is >= start date
-    const finalEndDate = endDate < startDate ? startDate : endDate;
+function EntityRow({
+  entity, days, getEventsForCell,
+  onCellClick, onEventClick, onDeleteEntity, onRenameEntity,
+}: EntityRowProps) {
+  const [hovering, setHovering] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(entity.name);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-    onSave({
-      name,
-      color,
-      startDate,
-      endDate: finalEndDate,
-      category,
-      priority,
-      notes
-    });
-  };
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function commitRename() {
+    const name = editName.trim();
+    if (name && name !== entity.name) onRenameEntity(entity.id, name);
+    else setEditName(entity.name);
+    setEditing(false);
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">Название</Label>
-        <Input 
-          id="name" 
-          value={name} 
-          onChange={e => setName(e.target.value)} 
-          placeholder="Что нужно сделать?"
-          autoFocus
-          required
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="start">Начало</Label>
-          <Input 
-            id="start" 
-            type="date" 
-            value={startDate} 
-            onChange={e => setStartDate(e.target.value)} 
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="end">Конец</Label>
-          <Input 
-            id="end" 
-            type="date" 
-            value={endDate} 
-            min={startDate}
-            onChange={e => setEndDate(e.target.value)} 
-            required
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Категория</Label>
-          <Select value={category} onValueChange={(v: any) => setCategory(v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(categoryLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Приоритет</Label>
-          <Select value={priority} onValueChange={(v: any) => setPriority(v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(priorityLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Цвет</Label>
-        <div className="flex gap-2">
-          {TASK_COLORS.map(c => (
-            <button
-              key={c}
-              type="button"
-              className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'border-foreground' : 'border-transparent'}`}
-              style={{ backgroundColor: c }}
-              onClick={() => setColor(c)}
+    <tr
+      className="group border-b border-border/40 hover:bg-accent/30 transition-colors"
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+    >
+      {/* Entity name cell */}
+      <td className="border-r border-border/40 px-3 py-1.5 sticky left-0 bg-background z-10 group-hover:bg-accent/30 transition-colors">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
+          {editing ? (
+            <input
+              ref={inputRef}
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={e => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
+              }}
+              className="text-sm bg-transparent border-b border-primary outline-none flex-1 min-w-0"
             />
-          ))}
+          ) : (
+            <span
+              className="text-sm truncate cursor-pointer hover:text-primary transition-colors"
+              onDoubleClick={() => setEditing(true)}
+              title={entity.name}
+            >
+              {entity.name}
+            </span>
+          )}
+          {hovering && !editing && (
+            <div className="flex items-center gap-0.5 ml-auto flex-shrink-0">
+              <button
+                onClick={() => setEditing(true)}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => onDeleteEntity(entity.id)}
+                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </td>
+
+      {/* Day cells */}
+      {days.map(day => {
+        const dateStr = format(day, "yyyy-MM-dd");
+        const cellEvents = getEventsForCell(entity.id, dateStr);
+        const weekend = isWeekend(day);
+        const todayCell = isToday(day);
+
+        return (
+          <td
+            key={dateStr}
+            className={`p-0.5 ${weekend ? "bg-background/40" : ""} ${todayCell ? "bg-primary/5" : ""}`}
+          >
+            <CellContents
+              events={cellEvents}
+              entityId={entity.id}
+              date={dateStr}
+              onAddClick={onCellClick}
+              onEventClick={onEventClick}
+            />
+          </td>
+        );
+      })}
+      <td />
+    </tr>
+  );
+}
+
+/* ── Cell contents ── */
+interface CellContentsProps {
+  events: PlannerEvent[];
+  entityId: string;
+  date: string;
+  onAddClick: (entityId: string, date: string, cell: HTMLElement) => void;
+  onEventClick: (event: PlannerEvent, entityId: string, date: string, cell: HTMLElement) => void;
+}
+
+function CellContents({ events, entityId, date, onAddClick, onEventClick }: CellContentsProps) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  if (events.length === 0) {
+    return (
+      <div
+        ref={ref}
+        data-testid={`cell-empty-${entityId}-${date}`}
+        onClick={() => ref.current && onAddClick(entityId, date, ref.current)}
+        className="cell-sq border border-border/40 hover:border-primary/40 hover:bg-accent/50 cursor-pointer transition-all rounded"
+        title="Добавить событие"
+      />
+    );
+  }
+
+  // Show first event as main color, stack indicator for multiples
+  const first = events[0];
+  return (
+    <div
+      ref={ref}
+      data-testid={`cell-event-${entityId}-${date}`}
+      onClick={() => ref.current && onEventClick(first, entityId, date, ref.current)}
+      className="cell-sq relative cursor-pointer rounded transition-all hover:opacity-80 hover:scale-105"
+      style={{ backgroundColor: STATUS_COLORS[first.status] }}
+      title={`${first.title} — ${STATUS_LABELS[first.status]}`}
+    >
+      {events.length > 1 && (
+        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-background border border-border text-[7px] font-bold flex items-center justify-center text-foreground">
+          {events.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── View popup ── */
+interface ViewPopupProps {
+  event: PlannerEvent;
+  onClose: () => void;
+  onConfirm: () => void;
+  onPostpone: () => void;
+  onDelete: () => void;
+  onEdit: (updated: PlannerEvent) => void;
+}
+
+function ViewPopup({ event, onClose, onConfirm, onPostpone, onDelete }: ViewPopupProps) {
+  const dateLabel = (() => {
+    try {
+      return format(parseISO(event.date), "d MMMM yyyy", { locale: ru });
+    } catch {
+      return event.date;
+    }
+  })();
+
+  const initials = event.assignee
+    .split(" ")
+    .map(p => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <div
+      className="rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Top bar with status color */}
+      <div className="h-1" style={{ backgroundColor: STATUS_COLORS[event.status] }} />
+
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div>
+            <p className="text-sm font-semibold text-foreground leading-tight">{event.title}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{dateLabel}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 py-3 border-y border-border my-3">
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+            style={{ backgroundColor: STATUS_COLORS[event.status] }}
+          >
+            {initials || "?"}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-foreground truncate">{event.assignee}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {STATUS_LABELS[event.status]}
+            </p>
+          </div>
+        </div>
+
+        {event.notes && (
+          <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{event.notes}</p>
+        )}
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onPostpone}
+            className="flex-1 text-xs py-1.5 px-3 rounded-md border border-border text-foreground hover:bg-accent transition-colors"
+          >
+            Перенести
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 text-xs py-1.5 px-3 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+          >
+            <Check className="w-3 h-3" />
+            Подтвердить
+          </button>
+          <button
+            onClick={onDelete}
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="space-y-2">
-        <Label htmlFor="notes">Заметки (необязательно)</Label>
-        <Textarea 
-          id="notes" 
-          value={notes} 
-          onChange={e => setNotes(e.target.value)} 
-          placeholder="Детали задачи..."
-          className="resize-none h-20"
-        />
-      </div>
+/* ── Add event popup ── */
+interface AddEventPopupProps {
+  entityId: string;
+  date: string;
+  onClose: () => void;
+  onAdd: (event: PlannerEvent) => void;
+}
 
-      <div className="flex justify-between pt-2">
-        {task ? (
-          <Button type="button" variant="destructive" onClick={onDelete}>Удалить</Button>
-        ) : (
-          <div /> // placeholder for flex-between
-        )}
-        <Button type="submit">Сохранить</Button>
+function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
+  const [title, setTitle] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [status, setStatus] = useState<EventStatus>("pending");
+  const [notes, setNotes] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  const dateLabel = (() => {
+    try { return format(parseISO(date), "d MMMM yyyy", { locale: ru }); } catch { return date; }
+  })();
+
+  function handleSubmit() {
+    if (!title.trim()) return;
+    onAdd({
+      id: generateId(),
+      entityId,
+      date,
+      status,
+      title: title.trim(),
+      assignee: assignee.trim() || "—",
+      notes: notes.trim() || undefined,
+    });
+  }
+
+  return (
+    <div
+      className="rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="h-1 bg-primary" />
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold">Новое событие</p>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">{dateLabel}</span>
+            <button
+              onClick={onClose}
+              className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent ml-2"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          <input
+            ref={titleRef}
+            data-testid="input-event-title"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            placeholder="Название события"
+            className="w-full text-sm bg-accent/50 border border-border rounded-md px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+          />
+          <input
+            data-testid="input-event-assignee"
+            value={assignee}
+            onChange={e => setAssignee(e.target.value)}
+            placeholder="Ответственный"
+            className="w-full text-sm bg-accent/50 border border-border rounded-md px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"
+          />
+          <div className="flex gap-1.5">
+            {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
+              <button
+                key={s}
+                data-testid={`status-${s}`}
+                onClick={() => setStatus(s)}
+                className={`flex-1 text-[10px] font-medium py-1 rounded-md border transition-all ${
+                  status === s
+                    ? "border-transparent text-white"
+                    : "border-border text-muted-foreground hover:border-border/80"
+                }`}
+                style={status === s ? { backgroundColor: STATUS_COLORS[s] } : {}}
+              >
+                {STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
+          <textarea
+            data-testid="input-event-notes"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Заметки (необязательно)"
+            rows={2}
+            className="w-full text-xs bg-accent/50 border border-border rounded-md px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground resize-none"
+          />
+        </div>
+
+        <button
+          data-testid="btn-save-event"
+          onClick={handleSubmit}
+          disabled={!title.trim()}
+          className="w-full mt-3 text-xs font-medium py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Добавить событие
+        </button>
       </div>
-    </form>
+    </div>
   );
 }
