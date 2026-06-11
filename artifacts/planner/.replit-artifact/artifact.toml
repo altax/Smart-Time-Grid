@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Календарь-планировщик"
+version = "1.0.0"
+id = "artifacts/planner"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22302
+
+[services.development]
+run = "pnpm --filter @workspace/planner run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/planner", "run", "build" ]
+publicDir = "artifacts/planner/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22302"
+BASE_PATH = "/"
