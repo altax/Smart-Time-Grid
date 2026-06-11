@@ -17,6 +17,14 @@ import {
 
 function genId() { return Math.random().toString(36).substring(2, 12); }
 
+/** Convert "HH:MM" to 0-100 percentage of 24-hour day */
+function timePct(t: string): number {
+  try {
+    const [h, m] = t.split(":").map(Number);
+    return ((h * 60 + m) / 1440) * 100;
+  } catch { return 0; }
+}
+
 const DAY_ABBR: Record<number, string> = {
   0:"ВС", 1:"ПН", 2:"ВТ", 3:"СР", 4:"ЧТ", 5:"ПТ", 6:"СБ",
 };
@@ -522,63 +530,176 @@ function GridCell({
   onDragStart, onDragEnd,
 }: GridCellProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [hovering, setHovering] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showTip  = () => { if (hideTimer.current) clearTimeout(hideTimer.current); setHovering(true); };
+  const hideTip  = () => { hideTimer.current = setTimeout(() => setHovering(false), 120); };
 
   if (events.length === 0) {
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
         className="group/c w-7 h-7 rounded cursor-pointer flex items-center justify-center
-          border border-transparent hover:border-border hover:bg-white/[0.04] transition-all"
-        title={`Добавить событие`}>
+          border border-transparent hover:border-border hover:bg-white/[0.04] transition-all">
         <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/50 transition-colors"/>
       </div>
     );
   }
 
-  const first = events[0];
-  const dur = first.startTime && first.endTime ? calcDuration(first.startTime, first.endTime) : "";
-  const hasTime = !!(first.startTime);
+  const first   = events[0];
+  const hasTime = !!(first.startTime && first.endTime);
+  const dur     = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
+  const color   = STATUS_COLORS[first.status];
+
+  /* ── timed cell: taller card with start / mini-bar / duration / end ── */
+  const timedCell = hasTime && (
+    <div className="flex flex-col items-stretch px-0.5 pt-0.5 pb-0.5 gap-[2px] h-full">
+      {/* start time */}
+      <span className="text-[7px] font-bold text-white/95 leading-none text-center tracking-tight">
+        {fmtTime(first.startTime!)}
+      </span>
+      {/* mini 24-hour bar */}
+      <div className="relative h-[5px] rounded-full bg-black/30 mx-0.5 overflow-hidden flex-shrink-0">
+        <div className="absolute h-full rounded-full bg-white/80"
+          style={{ left: `${timePct(first.startTime!)}%`, width: `${timePct(first.endTime!) - timePct(first.startTime!)}%` }}/>
+      </div>
+      {/* duration */}
+      <span className="text-[6px] font-extrabold text-white leading-none text-center tracking-tight">
+        {dur}
+      </span>
+      {/* end time */}
+      <span className="text-[7px] font-bold text-white/75 leading-none text-center tracking-tight">
+        {fmtTime(first.endTime!)}
+      </span>
+    </div>
+  );
 
   return (
-    <div ref={ref} data-testid={`cell-event-${entityId}-${date}`} data-event-id={first.id}
-      draggable
-      onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); }}
-      onDragEnd={onDragEnd}
-      onClick={e => {
-        if (e.shiftKey) { onShiftClick(first); return; }
-        ref.current && onEventClick(first, ref.current.getBoundingClientRect());
-      }}
-      onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-      className={`w-7 relative cursor-grab active:cursor-grabbing rounded overflow-hidden
-        transition-all hover:scale-110 hover:brightness-110 active:scale-95 active:opacity-60
-        ${hasTime ? "h-9" : "h-7"}`}
-      style={{ backgroundColor: STATUS_COLORS[first.status] }}
-      title={[
-        first.title,
-        STATUS_LABELS[first.status],
-        first.assignee,
-        first.startTime ? `${first.startTime}${first.endTime ? " → " + first.endTime : ""}${dur ? " ("+dur+")" : ""}` : "",
-        "Shift+клик = статус · ПКМ = меню · Перетащи = перенести"
-      ].filter(Boolean).join("\n")}>
-      {/* Drag handle hint */}
-      <div className="absolute top-0.5 right-0.5 opacity-0 hover:opacity-60">
-        <GripVertical className="w-2 h-2 text-white"/>
-      </div>
-      {/* Time label */}
-      {hasTime && (
-        <div className="absolute bottom-0 left-0 right-0 bg-black/25 px-0.5 py-px">
-          <span className="text-[7px] font-bold text-white leading-none block text-center tracking-tight">
-            {fmtTime(first.startTime!)}
+    <>
+      <div ref={ref}
+        data-testid={`cell-event-${entityId}-${date}`}
+        data-event-id={first.id}
+        draggable
+        onMouseEnter={showTip}
+        onMouseLeave={hideTip}
+        onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHovering(false); }}
+        onDragEnd={onDragEnd}
+        onClick={e => {
+          if (e.shiftKey) { onShiftClick(first); return; }
+          ref.current && onEventClick(first, ref.current.getBoundingClientRect());
+        }}
+        onContextMenu={e => onContextMenu(e.nativeEvent, first)}
+        className={`relative cursor-grab active:cursor-grabbing rounded overflow-visible
+          transition-all hover:brightness-115 active:scale-95 active:opacity-60
+          ${hasTime ? "w-8 h-[52px]" : "w-7 h-7 hover:scale-110"}`}
+        style={{ backgroundColor: color }}>
+
+        {hasTime ? timedCell : null}
+
+        {/* Multi-event badge */}
+        {events.length > 1 && (
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background border border-border
+            text-[7px] font-bold flex items-center justify-center text-foreground z-10">
+            {events.length}
           </span>
+        )}
+      </div>
+
+      {/* Rich hover tooltip */}
+      {hovering && (
+        <TimeTooltip event={first} dur={dur} anchorEl={ref.current} onEnter={showTip} onLeave={hideTip}/>
+      )}
+    </>
+  );
+}
+
+/* ─────────────────────── TimeTooltip ─────────────────────── */
+interface TimeTooltipProps {
+  event: PlannerEvent;
+  dur: string;
+  anchorEl: HTMLElement | null;
+  onEnter: () => void;
+  onLeave: () => void;
+}
+
+function TimeTooltip({ event, dur, anchorEl, onEnter, onLeave }: TimeTooltipProps) {
+  const hasTime = !!(event.startTime && event.endTime);
+  const color   = STATUS_COLORS[event.status];
+
+  const style = (() => {
+    if (!anchorEl) return { display: "none" } as React.CSSProperties;
+    const r   = anchorEl.getBoundingClientRect();
+    const W   = 256, H = hasTime ? 116 : 72;
+    const vw  = window.innerWidth, vh = window.innerHeight;
+    let left  = r.left + r.width / 2 - W / 2;
+    let top   = r.bottom + 6;
+    if (left + W > vw - 8) left = vw - W - 8;
+    if (left < 8)          left = 8;
+    if (top  + H > vh - 8) top  = r.top - H - 6;
+    return { position: "fixed" as const, left, top, width: W, zIndex: 9999 };
+  })();
+
+  const startP = hasTime ? timePct(event.startTime!) : 0;
+  const endP   = hasTime ? timePct(event.endTime!)   : 0;
+
+  return (
+    <div style={style}
+      className="rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}>
+      {/* Status stripe */}
+      <div className="h-0.5" style={{ backgroundColor: color }}/>
+
+      <div className="p-3">
+        {/* Title row */}
+        <div className="flex items-start gap-2 mb-2">
+          <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: color }}/>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground leading-tight truncate">{event.title}</p>
+            <p className="text-[10px] text-muted-foreground">{event.assignee} · {STATUS_LABELS[event.status]}</p>
+          </div>
         </div>
-      )}
-      {/* Multi-event badge */}
-      {events.length > 1 && (
-        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background border border-border
-          text-[7px] font-bold flex items-center justify-center text-foreground z-10">
-          {events.length}
-        </span>
-      )}
+
+        {hasTime && (
+          <>
+            {/* 24-hour timeline */}
+            <div className="mb-1">
+              <div className="relative h-4 bg-accent/40 rounded overflow-hidden">
+                {/* hour ticks */}
+                {[6, 12, 18].map(h => (
+                  <div key={h} className="absolute top-0 bottom-0 w-px bg-border/60"
+                    style={{ left: `${(h / 24) * 100}%` }}/>
+                ))}
+                {/* event block */}
+                <div className="absolute top-0.5 bottom-0.5 rounded"
+                  style={{ left: `${startP}%`, width: `${Math.max(endP - startP, 1.5)}%`, backgroundColor: color, opacity: 0.9 }}/>
+              </div>
+              {/* tick labels */}
+              <div className="flex justify-between text-[8px] text-muted-foreground/60 mt-0.5 px-0.5">
+                <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
+              </div>
+            </div>
+
+            {/* Time + duration row */}
+            <div className="flex items-center justify-between pt-1 border-t border-border">
+              <span className="text-[11px] font-semibold text-foreground">
+                {event.startTime}
+                <span className="text-muted-foreground mx-1">→</span>
+                {event.endTime}
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: `${color}25`, color }}>
+                <Clock className="w-2.5 h-2.5"/>{dur}
+              </span>
+            </div>
+          </>
+        )}
+
+        {!hasTime && (
+          <p className="text-[10px] text-muted-foreground/60 italic">Время не указано</p>
+        )}
+      </div>
     </div>
   );
 }
