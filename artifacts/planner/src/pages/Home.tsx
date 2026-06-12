@@ -592,14 +592,18 @@ function HorizontalTimeline({
           </button>
         </div>
 
-        {/* Hour markers */}
+        {/* Hour markers — tick every hour, label every 3 */}
         <div className="flex-1 relative h-4">
-          {[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => (
-            <span key={h}
-              className="absolute text-[8px] text-muted-foreground/40 font-mono leading-none -translate-x-1/2"
+          {Array.from({ length: 25 }, (_, h) => (
+            <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
               style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
-              {h}
-            </span>
+              {/* label only every 3h */}
+              {h % 3 === 0 && (
+                <span className="text-[8px] text-muted-foreground/50 font-mono leading-none mb-0.5">{h}</span>
+              )}
+              {/* tick mark for every hour */}
+              <div className={`w-px ${h % 6 === 0 ? "h-2 bg-border/60" : h % 3 === 0 ? "h-1.5 bg-border/40" : "h-1 bg-border/20"}`}/>
+            </div>
           ))}
         </div>
       </div>
@@ -633,10 +637,17 @@ function HorizontalTimeline({
             <div className="flex-1 relative h-5 rounded overflow-hidden"
               style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
 
-              {/* Hour grid lines */}
-              {[3, 6, 9, 12, 15, 18, 21].map(h => (
+              {/* Hour grid lines — every hour */}
+              {Array.from({ length: 23 }, (_, i) => i + 1).map(h => (
                 <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
-                  style={{ left: `${(h / 24) * 100}%`, backgroundColor: h % 6 === 0 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)" }}/>
+                  style={{
+                    left: `${(h / 24) * 100}%`,
+                    backgroundColor: h % 6 === 0
+                      ? "rgba(255,255,255,0.12)"
+                      : h % 3 === 0
+                        ? "rgba(255,255,255,0.07)"
+                        : "rgba(255,255,255,0.03)"
+                  }}/>
               ))}
 
               {/* Event blocks */}
