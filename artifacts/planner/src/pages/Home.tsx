@@ -8,14 +8,14 @@ import {
   ChevronLeft, ChevronRight, Plus, X, Check,
   Pencil, Trash2, RotateCcw, Sparkles, Clock,
   Dumbbell, Briefcase, Star, Car, UtensilsCrossed,
-  Copy, TrendingUp, CalendarDays,
+  Copy, TrendingUp, CalendarDays, AlertTriangle,
 } from "lucide-react";
 import { usePlanner } from "../hooks/use-planner";
 import {
   Entity, PlannerEvent, EventStatus, EventIcon,
   STATUS_COLORS, STATUS_GRADIENTS, STATUS_LABELS, STATUS_CYCLE,
   EVENT_ICON_LABELS,
-  calcDuration, calcDurationMins, fmtTime, addMinutes,
+  calcDuration, calcDurationMins, fmtTime, addMinutes, hasTimeOverlap,
 } from "../types";
 
 /* ── Ozon PVZ icon ── */
@@ -553,11 +553,13 @@ export default function Home() {
         <div ref={popupRef} style={popupStyle(popup.anchor)}>
           {popup.mode === "add" && (
             <AddEventPopup entityId={popup.entityId} date={popup.date}
+              existingEvents={getEventsForCell(popup.entityId, popup.date)}
               onClose={() => setPopup(null)}
               onAdd={ev => { addEvent(ev); setPopup(null); }}/>
           )}
           {popup.mode === "view" && (
             <ViewPopup event={popup.event}
+              existingEvents={getEventsForCell(popup.event.entityId, popup.event.date)}
               onClose={() => setPopup(null)}
               onStatusChange={status => { updateEvent({ ...popup.event, status }); setPopup(null); }}
               onDelete={() => { deleteEvent(popup.event.id); setPopup(null); }}
@@ -1178,6 +1180,74 @@ function GridCell({
     );
   }
 
+  /* ── Multi-event cell ── */
+  if (events.length > 1) {
+    const timedEvs = events.filter(e => e.startTime && e.endTime);
+    const totalBusy = timedEvs.reduce((s, e) => s + calcDurationMins(e.startTime!, e.endTime!), 0);
+    const freeWorkMins = Math.max(0, 960 - totalBusy); // 16h window 6–22
+    const freeLabel = freeWorkMins > 0
+      ? (freeWorkMins >= 60
+          ? `${Math.floor(freeWorkMins / 60)}ч${freeWorkMins % 60 > 0 ? ` ${freeWorkMins % 60}м` : ""}`
+          : `${freeWorkMins}м`) + " своб."
+      : "Занято";
+
+    return (
+      <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
+        className="relative w-full min-h-[48px] rounded-md overflow-hidden border border-white/10
+          bg-white/[0.05] p-1 flex flex-col gap-0.5">
+
+        {/* Mini timeline 6:00–22:00 */}
+        <div className="w-full h-[5px] rounded-full bg-black/30 relative overflow-hidden flex-shrink-0">
+          {timedEvs.map(ev => {
+            const left = workPct(ev.startTime!);
+            const w    = Math.max(3, workPct(ev.endTime!) - left);
+            return (
+              <div key={ev.id} className="absolute top-0 bottom-0 rounded-sm"
+                style={{ left: `${left}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status] }}/>
+            );
+          })}
+        </div>
+
+        {/* Event list — each clickable */}
+        <div className="flex flex-col gap-px flex-1 min-h-0">
+          {events.slice(0, 3).map(ev => (
+            <button key={ev.id}
+              onClick={e => { e.stopPropagation(); ref.current && onEventClick(ev, ref.current.getBoundingClientRect()); }}
+              onContextMenu={e => { e.stopPropagation(); onContextMenu(e.nativeEvent, ev); }}
+              className="flex items-center gap-1 w-full text-left hover:bg-white/10 rounded px-0.5 py-px transition-colors group/chip">
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: STATUS_COLORS[ev.status] }}/>
+              <span className="text-[7px] text-white/75 truncate leading-none font-medium">
+                {ev.startTime ? `${fmtTime(ev.startTime)}` : ev.title.slice(0, 8)}
+              </span>
+              {ev.endTime && (
+                <span className="text-[6px] text-white/40 leading-none ml-auto flex-shrink-0 hidden group-hover/chip:block">
+                  –{fmtTime(ev.endTime)}
+                </span>
+              )}
+            </button>
+          ))}
+          {events.length > 3 && (
+            <span className="text-[6.5px] text-white/40 px-0.5">+{events.length - 3} ещё</span>
+          )}
+        </div>
+
+        {/* Footer: free time + add button */}
+        <div className="flex items-center justify-between mt-auto flex-shrink-0">
+          <span className={`text-[6.5px] leading-none font-medium ${freeWorkMins > 0 ? "text-white/35" : "text-rose-400/70"}`}>
+            {freeLabel}
+          </span>
+          <button
+            onClick={e => { e.stopPropagation(); ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect()); }}
+            className="w-4 h-4 rounded flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/15 transition-colors flex-shrink-0">
+            <Plus className="w-2.5 h-2.5"/>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Single event card ── */
   const first   = events[0];
   const hasTime = !!(first.startTime && first.endTime);
   const dur     = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
@@ -1209,14 +1279,6 @@ function GridCell({
           transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg select-none"
         style={{ background: gradient }}>
 
-        {/* Multi-event badge */}
-        {events.length > 1 && (
-          <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/30 text-[8px] font-bold
-            flex items-center justify-center text-white z-10">
-            {events.length}
-          </span>
-        )}
-
         {/* Icon */}
         {first.icon && first.icon !== "none" && (
           <span className="absolute top-1.5 left-1.5 opacity-80">
@@ -1229,7 +1291,6 @@ function GridCell({
           <p className="text-white text-[9px] font-semibold leading-tight line-clamp-2 drop-shadow-sm">
             {first.title}
           </p>
-
           <div className="mt-auto">
             {hasTime && (
               <p className="text-white/75 text-[8px] font-mono leading-none mb-1">
@@ -1241,7 +1302,6 @@ function GridCell({
               <div className="h-full rounded-full bg-white/50 transition-all"
                 style={{ width: `${span * 100}%`, marginLeft: `${startFrac * (1 - span) * 100}%` }}/>
             </div>
-            {/* Earnings or duration */}
             {earn > 0 ? (
               <p className="text-white/80 text-[8px] font-bold leading-none mt-1 tabular-nums">
                 {earn >= 1000 ? `${Math.round(earn / 100) / 10}к ₽` : `${earn} ₽`}
@@ -1251,8 +1311,6 @@ function GridCell({
             ) : null}
           </div>
         </div>
-
-        {/* Shift-click hint overlay */}
         <div className="absolute inset-0 opacity-0 group-hover/ev:opacity-100 bg-black/10 transition-opacity pointer-events-none rounded-md"/>
       </div>
 
@@ -1485,11 +1543,12 @@ function TimePicker({ startTime, endTime, onStartChange, onEndChange }: TimePick
 interface AddEventPopupProps {
   entityId: string;
   date: string;
+  existingEvents: PlannerEvent[];
   onClose: () => void;
   onAdd: (ev: PlannerEvent) => void;
 }
 
-function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
+function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEventPopupProps) {
   const [title,     setTitle]     = useState("");
   const [assignee,  setAssignee]  = useState("");
   const [status,    setStatus]    = useState<EventStatus>("pending");
@@ -1506,8 +1565,18 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
     try { return format(parseISO(date), "d MMMM yyyy", { locale: ru }); } catch { return date; }
   })();
 
+  /* Conflict detection */
+  const conflict = useTime && startTime && endTime
+    ? existingEvents.find(e =>
+        e.startTime && e.endTime &&
+        hasTimeOverlap(startTime, endTime, e.startTime, e.endTime)
+      )
+    : undefined;
+
+  const canSubmit = !!title.trim() && !conflict;
+
   const submit = () => {
-    if (!title.trim()) return;
+    if (!canSubmit) return;
     onAdd({
       id: genId(), entityId, date, status,
       title: title.trim(),
@@ -1557,13 +1626,24 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
             </button>
 
             {useTime && (
-              <div className="mt-2">
+              <div className="mt-2 space-y-2">
                 <TimePicker
                   startTime={startTime}
                   endTime={endTime}
                   onStartChange={setStartTime}
                   onEndChange={setEndTime}
                 />
+                {conflict && (
+                  <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-destructive/10 border border-destructive/30">
+                    <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0 mt-0.5"/>
+                    <div>
+                      <p className="text-[10px] font-semibold text-destructive leading-tight">Конфликт времени</p>
+                      <p className="text-[9px] text-destructive/80 mt-0.5 leading-tight">
+                        Пересекается с «{conflict.title}»{conflict.startTime ? ` (${conflict.startTime}–${conflict.endTime})` : ""}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1599,7 +1679,7 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
           </div>
         </div>
 
-        <button data-testid="btn-save-event" onClick={submit} disabled={!title.trim()}
+        <button data-testid="btn-save-event" onClick={submit} disabled={!canSubmit}
           className="w-full mt-3 text-xs font-semibold py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           Добавить событие
         </button>
@@ -1612,13 +1692,14 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
 /* ─────────────────────── ViewPopup ─────────────────────── */
 interface ViewPopupProps {
   event: PlannerEvent;
+  existingEvents: PlannerEvent[];
   onClose: () => void;
   onStatusChange: (s: EventStatus) => void;
   onDelete: () => void;
   onSave: (upd: PlannerEvent) => void;
 }
 
-function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave, onDuplicate }: ViewPopupProps & { onDuplicate: (date: string) => void }) {
+function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, onSave, onDuplicate }: ViewPopupProps & { onDuplicate: (date: string) => void }) {
   const [editTitle,    setEditTitle]    = useState(event.title);
   const [editAssignee, setEditAssignee] = useState(event.assignee);
   const [editNotes,    setEditNotes]    = useState(event.notes ?? "");
@@ -1637,10 +1718,19 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave, onDuplica
   const initials = event.assignee.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "?";
   const dur = startTime && endTime ? calcDuration(startTime, endTime) : "";
 
+  /* Conflict detection — exclude the event being edited */
+  const conflict = startTime && endTime
+    ? existingEvents.find(e =>
+        e.id !== event.id &&
+        e.startTime && e.endTime &&
+        hasTimeOverlap(startTime, endTime, e.startTime, e.endTime)
+      )
+    : undefined;
+
   const mark = () => setDirty(true);
 
   const save = () => {
-    if (!editTitle.trim()) return;
+    if (!editTitle.trim() || conflict) return;
     onSave({
       ...event,
       title:     editTitle.trim(),
@@ -1689,6 +1779,17 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave, onDuplica
             onStartChange={v => { setStartTime(v); mark(); }}
             onEndChange={v => { setEndTime(v); mark(); }}
           />
+          {conflict && (
+            <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-destructive/10 border border-destructive/30">
+              <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0 mt-0.5"/>
+              <div>
+                <p className="text-[10px] font-semibold text-destructive leading-tight">Конфликт времени</p>
+                <p className="text-[9px] text-destructive/80 mt-0.5 leading-tight">
+                  Пересекается с «{conflict.title}»{conflict.startTime ? ` (${conflict.startTime}–${conflict.endTime})` : ""}
+                </p>
+              </div>
+            </div>
+          )}
 
           <textarea value={editNotes} onChange={e => { setEditNotes(e.target.value); mark(); }}
             placeholder="Заметки..."
@@ -1724,8 +1825,8 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave, onDuplica
         {/* Actions */}
         <div className="flex items-center gap-2">
           {dirty ? (
-            <button onClick={save}
-              className="flex-1 text-xs font-semibold py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1">
+            <button onClick={save} disabled={!!conflict}
+              className="flex-1 text-xs font-semibold py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
               <Check className="w-3 h-3"/> Сохранить
             </button>
           ) : (

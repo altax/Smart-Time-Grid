@@ -97,3 +97,13 @@ export function addMinutes(time: string, mins: number): string {
     return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
   } catch { return time; }
 }
+
+/** "HH:MM" → minutes since midnight */
+export function timeToMins(t: string): number {
+  try { const [h, m] = t.split(":").map(Number); return h * 60 + m; } catch { return 0; }
+}
+
+/** Returns true if time intervals [s1,e1) and [s2,e2) overlap */
+export function hasTimeOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
+  return timeToMins(s1) < timeToMins(e2) && timeToMins(e1) > timeToMins(s2);
+}
