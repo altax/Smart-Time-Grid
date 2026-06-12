@@ -333,99 +333,81 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex flex-col h-screen overflow-hidden text-foreground" style={{ backgroundColor: "#1b1d2f" }}>
 
-      {/* ── Header ── */}
-      <header className="flex items-center justify-between px-5 py-2.5 border-b border-border/50 flex-shrink-0 gap-4">
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-3 h-3 text-primary/80">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <span className="text-xs font-semibold tracking-tight text-foreground/80">Планировщик</span>
-        </div>
+      {/* ── Grid ── */}
+      <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
+        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: "#1b1d2f", minWidth: "100%" }}>
+          <colgroup>
+            <col style={{ width: 150, minWidth: 150 }}/>
+            {days.map(d => <col key={d.toISOString()} style={{ width: 24, minWidth: 24 }}/>)}
+          </colgroup>
 
-        <div className="flex items-center gap-1">
-          <button data-testid="btn-prev-month"
-            onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-            className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
-            <ChevronLeft className="w-3 h-3"/>
-          </button>
-          <button data-testid="btn-today"
-            onClick={() => setCurrentMonth(new Date())}
-            className="px-3 h-6 rounded text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors min-w-[120px] text-center">
-            {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-          </button>
-          <button data-testid="btn-next-month"
-            onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-            className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
-            <ChevronRight className="w-3 h-3"/>
-          </button>
-        </div>
-
-        <button data-testid="btn-add-row-header"
-          onClick={() => setShowAddRow(true)}
-          className="flex items-center gap-1.5 text-[11px] font-medium px-3 h-6 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0">
-          <Plus className="w-3 h-3"/> Добавить строку
-        </button>
-      </header>
-
-      {/* ── Main content area ── */}
-      <div className="flex flex-1 min-h-0">
-
-        {/* ── Grid ── */}
-        <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
-          <table className="border-collapse" style={{ tableLayout: "fixed" }}>
-            <colgroup>
-              <col style={{ width: 160, minWidth: 160 }}/>
-              {days.map(d => <col key={d.toISOString()} style={{ width: 28, minWidth: 28 }}/>)}
-            </colgroup>
-
-            <thead className="sticky top-0 z-20">
-              {/* ── Day numbers row ── */}
-              <tr>
-                <th className="bg-card border-b border-r border-border/50 px-3 py-2 text-left align-middle">
-                  <span className="text-[11px] font-medium text-muted-foreground/60 tracking-wide">Ресторан</span>
-                </th>
-                {days.map(day => {
-                  const tod   = isToday(day), wknd = isWeekend(day);
-                  return (
-                    <th key={day.toISOString()}
-                      ref={tod ? todayThRef : undefined}
-                      className={`border-b border-r border-border/30 py-1.5 text-center align-middle
-                        ${wknd ? "bg-muted/40" : "bg-card"}`}>
-                      <div className="flex flex-col items-center gap-[2px]">
-                        <span className={`text-[10px] font-bold w-[17px] h-[17px] flex items-center justify-center rounded-full leading-none
-                          ${tod ? "text-white" : wknd ? "text-muted-foreground/45" : "text-foreground/65"}`}
-                          style={tod ? { backgroundColor: "#f06060" } : {}}>
-                          {format(day, "d")}
-                        </span>
-                        <span className={`text-[7px] font-medium leading-none ${wknd ? "text-muted-foreground/30" : "text-muted-foreground/45"}`}>
-                          {DAY_ABBR[day.getDay()]}
-                        </span>
-                      </div>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
+          <thead className="sticky top-0 z-20" style={{ backgroundColor: "#1b1d2f" }}>
+            <tr>
+              {/* "Ресторан" + embedded month nav */}
+              <th className="px-4 py-3 text-left align-middle" style={{ background: "transparent" }}>
+                <div className="flex items-center justify-between min-w-0">
+                  <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.38)" }}>Ресторан</span>
+                  <div className="flex items-center gap-0.5">
+                    <button data-testid="btn-prev-month"
+                      onClick={() => setCurrentMonth(m => subMonths(m, 1))}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
+                      style={{ color: "rgba(255,255,255,0.32)" }}>
+                      <ChevronLeft className="w-3 h-3"/>
+                    </button>
+                    <button data-testid="btn-today"
+                      onClick={() => setCurrentMonth(new Date())}
+                      className="text-[9px] px-1 rounded hover:bg-white/10 transition-colors whitespace-nowrap"
+                      style={{ color: "rgba(255,255,255,0.28)" }}>
+                      {MONTH_NAMES[currentMonth.getMonth()].slice(0, 3)} {currentMonth.getFullYear()}
+                    </button>
+                    <button data-testid="btn-next-month"
+                      onClick={() => setCurrentMonth(m => addMonths(m, 1))}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 transition-colors"
+                      style={{ color: "rgba(255,255,255,0.32)" }}>
+                      <ChevronRight className="w-3 h-3"/>
+                    </button>
+                  </div>
+                </div>
+              </th>
+              {days.map(day => {
+                const tod = isToday(day), wknd = isWeekend(day);
+                return (
+                  <th key={day.toISOString()}
+                    ref={tod ? todayThRef : undefined}
+                    className="text-center pb-2 pt-3 align-bottom"
+                    style={{ background: "transparent" }}>
+                    <div className="flex flex-col items-center gap-[2px]">
+                      <span
+                        className="text-[10px] font-semibold w-[16px] h-[16px] flex items-center justify-center rounded-full leading-none"
+                        style={{
+                          backgroundColor: tod ? "#f06060" : "transparent",
+                          color: tod ? "#fff" : wknd ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.5)"
+                        }}>
+                        {format(day, "d")}
+                      </span>
+                      <span className="text-[7px] font-medium leading-none"
+                        style={{ color: wknd ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.26)" }}>
+                        {DAY_ABBR[day.getDay()]}
+                      </span>
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
 
             <tbody>
               {entities.length === 0 && (
                 <tr>
-                  <td colSpan={days.length + 2} className="py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Sparkles className="w-5 h-5 text-primary"/>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium mb-1">Нет данных</p>
-                        <p className="text-xs text-muted-foreground">Добавьте строку или загрузите демо</p>
-                      </div>
+                  <td colSpan={days.length + 1}
+                    style={{ background: "transparent", borderRadius: 0, padding: "60px 0", textAlign: "center" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Нет данных</p>
                       <button data-testid="btn-demo" onClick={loadDemoData}
-                        className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium">
-                        <Sparkles className="w-3.5 h-3.5"/> Загрузить демо-данные
+                        style={{ fontSize: 11, padding: "5px 14px", borderRadius: 6, backgroundColor: "rgba(240,96,96,0.14)", color: "#f06060", border: "none", cursor: "pointer" }}>
+                        Загрузить демо-данные
                       </button>
                     </div>
                   </td>
@@ -462,12 +444,9 @@ export default function Home() {
               {/* ── Add entity row ── */}
               {showAddRow ? (
                 <tr>
-                  <td colSpan={days.length + 2}
-                    className="border-t-2 border-primary/30 bg-primary/5 px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <Plus className="w-3.5 h-3.5 text-primary"/>
-                      </div>
+                  <td colSpan={days.length + 1}
+                    style={{ background: "transparent", borderRadius: 0, padding: "4px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input ref={addRowRef} data-testid="input-new-entity"
                         value={newEntityName}
                         onChange={e => setNewEntityName(e.target.value)}
@@ -475,67 +454,45 @@ export default function Home() {
                           if (e.key === "Enter") handleAddEntity();
                           if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
                         }}
-                        placeholder="Название объекта (Enter для добавления)..."
-                        className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50"/>
+                        placeholder="Название объекта..."
+                        style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", border: "none", color: "rgba(255,255,255,0.7)" }}/>
                       <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground
-                          hover:bg-primary/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        style={{ fontSize: 11, padding: "3px 10px", borderRadius: 4, backgroundColor: "#f06060", color: "#fff", border: "none", cursor: "pointer", opacity: newEntityName.trim() ? 1 : 0.35 }}>
                         Добавить
                       </button>
                       <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                        <X className="w-3.5 h-3.5"/>
+                        style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <X style={{ width: 12, height: 12, color: "rgba(255,255,255,0.35)" }}/>
                       </button>
                     </div>
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={days.length + 2}
+                  <td colSpan={days.length + 1}
                     onClick={() => setShowAddRow(true)}
-                    className="border-t border-dashed border-border/40 cursor-pointer group/add hover:bg-primary/5 transition-colors">
-                    <div className="flex items-center gap-2 px-3 py-2">
-                      <div className="w-5 h-5 rounded-md border-2 border-dashed border-border/40
-                        group-hover/add:border-primary/50 flex items-center justify-center transition-colors">
-                        <Plus className="w-3 h-3 text-muted-foreground/30 group-hover/add:text-primary/70 transition-colors"/>
-                      </div>
-                      <span className="text-xs text-muted-foreground/40 group-hover/add:text-primary/70 transition-colors">
-                        Добавить объект
-                      </span>
+                    style={{ background: "transparent", borderRadius: 0, padding: "5px 16px", cursor: "pointer" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <Plus style={{ width: 11, height: 11, color: "rgba(255,255,255,0.2)" }}/>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>Добавить объект</span>
                     </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-
       </div>
 
-      {/* ── Status bar ── */}
-      <footer className="border-t border-border/40 flex-shrink-0">
-        <div className="flex items-center gap-5 px-5 py-2">
-          {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
-            <div key={s} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[s] }}/>
-              <span className="text-[11px] text-muted-foreground/70">{STATUS_LABELS[s]}</span>
-            </div>
-          ))}
-          <div className="ml-auto flex items-center gap-4">
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.overdue }}/>{overdueN}
-            </span>
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.confirmed }}/>{confirmedN}
-            </span>
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.pending }}/>{pendingN}
-            </span>
-            <span className="border-l border-border/40 pl-4 text-[11px] text-muted-foreground/50">Всего: <strong className="text-foreground/70">{events.length}</strong></span>
+      {/* ── Legend footer ── */}
+      <div className="flex-shrink-0 flex items-center justify-center gap-6 py-3"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
+          <div key={s} className="flex items-center gap-2">
+            <span className="rounded-full" style={{ width: 7, height: 7, backgroundColor: STATUS_COLORS[s], display: "inline-block" }}/>
+            <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{STATUS_LABELS[s]}</span>
           </div>
-          <span className="text-[10px] text-muted-foreground/30 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
-        </div>
-      </footer>
+        ))}
+      </div>
 
       {/* ── Popup ── */}
       {popup && (
@@ -684,11 +641,11 @@ function EntityRow({
   };
 
   return (
-    <tr className="group hover:brightness-[1.08] transition-all">
-      {/* Name */}
-      <td className="border-r border-b border-border/40 px-3 py-0 sticky left-0 bg-background z-10 group-hover:bg-accent/30 transition-colors h-[32px]">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="w-[6px] h-[6px] rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
+    <tr>
+      {/* Entity name — transparent, no tile effect */}
+      <td style={{ background: "transparent", borderRadius: 0, padding: "0 16px", height: "28px", verticalAlign: "middle" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+          <span style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: entity.color, flexShrink: 0, display: "inline-block" }}/>
           {editing ? (
             <input ref={inputRef} value={editName}
               onChange={e => setEditName(e.target.value)}
@@ -697,40 +654,55 @@ function EntityRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
               }}
-              className="text-[12px] bg-transparent border-b border-primary outline-none flex-1 min-w-0 text-foreground"/>
+              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: "1px solid #f06060", color: "rgba(255,255,255,0.7)", minWidth: 0 }}/>
           ) : (
-            <span className="text-[12px] truncate cursor-default text-foreground/75" onDoubleClick={() => setEditing(true)} title={entity.name}>
+            <span
+              onDoubleClick={() => setEditing(true)}
+              title={entity.name}
+              style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, cursor: "default" }}>
               {entity.name}
             </span>
           )}
           {!editing && (
-            <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <div className="group-hover-actions" style={{ display: "flex", gap: 2, opacity: 0, transition: "opacity 0.15s" }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "0"}>
               <button onClick={() => setEditing(true)} title="Переименовать"
-                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-white/10">
-                <Pencil className="w-2.5 h-2.5"/>
+                style={{ width: 16, height: 16, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, color: "rgba(255,255,255,0.4)" }}>
+                <Pencil style={{ width: 10, height: 10 }}/>
               </button>
               <button onClick={() => onDeleteEntity(entity.id)} title="Удалить"
-                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-white/10">
-                <Trash2 className="w-2.5 h-2.5"/>
+                style={{ width: 16, height: 16, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 3, color: "rgba(255,255,255,0.4)" }}>
+                <Trash2 style={{ width: 10, height: 10 }}/>
               </button>
             </div>
           )}
         </div>
       </td>
 
-      {/* Day cells */}
+      {/* Day cells — each td IS the tile */}
       {days.map(day => {
         const dateStr = format(day, "yyyy-MM-dd");
         const cellEvents = getEventsForCell(entity.id, dateStr);
-        const wknd = isWeekend(day), tod = isToday(day);
         const key = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
+        const firstEv = cellEvents[0];
+        const tileColor = isDragTarget
+          ? "rgba(240,96,96,0.35)"
+          : firstEv
+            ? STATUS_COLORS[firstEv.status]
+            : "#111320";
         return (
           <td key={dateStr}
-            className={`border-r border-b border-border/30 p-0 align-middle h-[32px]
-              ${wknd ? "bg-muted/25" : "bg-accent/20"}
-              ${tod  ? "bg-[#f06060]/[0.07]" : ""}
-              ${isDragTarget ? "bg-[#f06060]/15 ring-1 ring-inset ring-[#f06060]/30" : ""}`}
+            style={{
+              backgroundColor: tileColor,
+              borderRadius: "3px",
+              padding: 0,
+              height: "26px",
+              verticalAlign: "middle",
+              opacity: (firstEv?.done && !isDragTarget) ? 0.38 : 1,
+              transition: "background-color 0.12s",
+            }}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}
             onDrop={e => { e.preventDefault(); onDrop(entity.id, dateStr); }}>
@@ -997,45 +969,54 @@ function GridCell({
   const showCard = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHoverCard(true); };
   const hideCard = () => { hoverTimer.current = setTimeout(() => setHoverCard(false), 80); };
 
-  /* ── Empty cell ── */
+  /* ── Empty cell — td is the dark tile, this is just the click zone ── */
   if (events.length === 0) {
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
         onMouseEnter={onCellEnter}
         onMouseLeave={onCellLeave}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className="group/c w-full h-full flex items-center justify-center cursor-pointer transition-colors hover:bg-white/[0.06]">
-        <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/30 transition-colors"/>
-      </div>
+        style={{ width: "100%", height: "100%", cursor: "pointer" }}
+      />
     );
   }
 
-  /* ── Multi-event cell: stacked slim vertical bars ── */
+  /* ── Multi-event cell — td shows first event color, dots indicate more ── */
   if (events.length > 1) {
+    const first = events[0];
+    const hasTime = !!(first.startTime && first.endTime);
+    const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
     return (
-      <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
-        onMouseEnter={onCellEnter}
-        onMouseLeave={onCellLeave}
-        className="w-full h-full flex items-center justify-center gap-[2px] cursor-pointer"
-        onClick={e => { e.stopPropagation(); ref.current && onEventClick(events[0], ref.current.getBoundingClientRect()); }}>
-        {events.slice(0, 3).map(ev => (
-          <button key={ev.id}
-            onClick={e => { e.stopPropagation(); ref.current && onEventClick(ev, ref.current.getBoundingClientRect()); }}
-            onContextMenu={e => { e.stopPropagation(); onContextMenu(e.nativeEvent, ev); }}
-            className="w-[6px] h-[20px] rounded-[2px] flex-shrink-0 hover:brightness-125 transition-all"
-            style={{ backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.4 : 0.85 }}
-          />
-        ))}
-        {events.length > 3 && (
-          <span className="text-[6px] text-muted-foreground/40 leading-none">+{events.length - 3}</span>
+      <>
+        <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
+          data-event-id={first.id}
+          draggable
+          onMouseEnter={() => { onCellEnter(); hoveredEventForCopy = first; showCard(); }}
+          onMouseLeave={() => { onCellLeave(); hoveredEventForCopy = null; hideCard(); }}
+          onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHoverCard(false); }}
+          onDragEnd={onDragEnd}
+          onClick={e => {
+            if (e.shiftKey) { onShiftClick(first); return; }
+            ref.current && onEventClick(first, ref.current.getBoundingClientRect());
+          }}
+          onContextMenu={e => onContextMenu(e.nativeEvent, first)}
+          style={{ width: "100%", height: "100%", cursor: "grab", position: "relative", display: "flex", alignItems: "flex-end", justifyContent: "flex-end" }}>
+          {events.length > 1 && (
+            <span style={{ fontSize: 7, color: "rgba(255,255,255,0.75)", lineHeight: 1, padding: "1px 2px", background: "rgba(0,0,0,0.3)", borderRadius: 2, position: "absolute", bottom: 1, right: 1 }}>
+              +{events.length - 1}
+            </span>
+          )}
+        </div>
+        {hoverCard && (
+          <EventInfoCard event={first} dur={dur} anchorEl={ref.current}
+            onEnter={showCard} onLeave={hideCard} onDoneToggle={onDoneToggle}/>
         )}
-      </div>
+      </>
     );
   }
 
-  /* ── Single event: clean centered colored square ── */
+  /* ── Single event — td is the status-colored tile, this is just interaction ── */
   const first = events[0];
-  const color = STATUS_COLORS[first.status];
   const hasTime = !!(first.startTime && first.endTime);
   const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
 
@@ -1045,8 +1026,8 @@ function GridCell({
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
         draggable
-        onMouseEnter={() => { hoveredPasteTarget = { entityId, date }; hoveredEventForCopy = first; showCard(); }}
-        onMouseLeave={() => { hoveredPasteTarget = null; hoveredEventForCopy = null; hideCard(); }}
+        onMouseEnter={() => { onCellEnter(); hoveredEventForCopy = first; showCard(); }}
+        onMouseLeave={() => { onCellLeave(); hoveredEventForCopy = null; hideCard(); }}
         onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHoverCard(false); }}
         onDragEnd={onDragEnd}
         onClick={e => {
@@ -1054,18 +1035,13 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className={`relative w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing group/ev transition-all hover:brightness-110 select-none
-          ${copiedEventId === first.id ? "outline outline-1 outline-sky-400/60" : ""}`}>
-        <div
-          className="w-[18px] h-[18px] rounded-[3px] flex-shrink-0 transition-all group-hover/ev:scale-110 group-hover/ev:shadow-lg group-hover/ev:shadow-black/40"
-          style={{ backgroundColor: color, opacity: first.done ? 0.35 : 0.85 }}
-        />
-        {first.done && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <Check className="w-2 h-2 text-white drop-shadow" style={{ opacity: 0.9 }}/>
-          </div>
-        )}
-      </div>
+        style={{
+          width: "100%", height: "100%",
+          cursor: "grab",
+          outline: copiedEventId === first.id ? "1px solid rgba(125,211,252,0.6)" : "none",
+          outlineOffset: "-1px",
+        }}
+      />
 
       {/* ── Hover Info Card ── */}
       {hoverCard && (
