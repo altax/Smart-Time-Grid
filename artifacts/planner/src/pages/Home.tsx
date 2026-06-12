@@ -335,6 +335,9 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen overflow-hidden text-foreground" style={{ backgroundColor: "#1b1d2f" }}>
 
+      {/* ── Main area: grid + right sidebar ── */}
+      <div className="flex flex-1 min-h-0">
+
       {/* ── Grid ── */}
       <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
         <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: "#1b1d2f", minWidth: "100%" }}>
@@ -444,9 +447,9 @@ export default function Home() {
               {/* ── Add entity row ── */}
               {showAddRow ? (
                 <tr>
-                  <td colSpan={days.length + 1}
-                    style={{ background: "transparent", borderRadius: 0, padding: "4px 16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Input only in entity column */}
+                  <td style={{ background: "transparent", borderRadius: 0, padding: "3px 12px", height: "28px", verticalAlign: "middle" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <input ref={addRowRef} data-testid="input-new-entity"
                         value={newEntityName}
                         onChange={e => setNewEntityName(e.target.value)}
@@ -454,27 +457,32 @@ export default function Home() {
                           if (e.key === "Enter") handleAddEntity();
                           if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
                         }}
-                        placeholder="Название объекта..."
-                        style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", border: "none", color: "rgba(255,255,255,0.7)" }}/>
+                        placeholder="Название..."
+                        style={{ flex: 1, minWidth: 0, fontSize: 11, background: "transparent", outline: "none", border: "none", color: "rgba(255,255,255,0.7)" }}/>
                       <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
-                        style={{ fontSize: 11, padding: "3px 10px", borderRadius: 4, backgroundColor: "#f06060", color: "#fff", border: "none", cursor: "pointer", opacity: newEntityName.trim() ? 1 : 0.35 }}>
-                        Добавить
+                        style={{ fontSize: 10, padding: "2px 8px", borderRadius: 3, backgroundColor: "#f06060", color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.35 }}>
+                        ОК
                       </button>
                       <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
-                        style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <X style={{ width: 12, height: 12, color: "rgba(255,255,255,0.35)" }}/>
+                        style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <X style={{ width: 11, height: 11, color: "rgba(255,255,255,0.35)" }}/>
                       </button>
                     </div>
                   </td>
+                  {/* Empty tiles for day columns */}
+                  {days.map(day => (
+                    <td key={format(day, "yyyy-MM-dd")}
+                      style={{ backgroundColor: isWeekend(day) ? "#121224" : "#141626", borderRadius: "3px", height: "24px" }}/>
+                  ))}
                 </tr>
               ) : (
                 <tr>
                   <td colSpan={days.length + 1}
                     onClick={() => setShowAddRow(true)}
                     style={{ background: "transparent", borderRadius: 0, padding: "5px 16px", cursor: "pointer" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Plus style={{ width: 11, height: 11, color: "rgba(255,255,255,0.2)" }}/>
-                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>Добавить объект</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <Plus style={{ width: 10, height: 10, color: "rgba(255,255,255,0.18)" }}/>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.18)" }}>Добавить объект</span>
                     </div>
                   </td>
                 </tr>
@@ -482,6 +490,26 @@ export default function Home() {
             </tbody>
           </table>
       </div>
+
+      {/* ── Right sidebar ── */}
+      <div className="flex-shrink-0 flex flex-col" style={{ width: 240, borderLeft: "1px solid rgba(255,255,255,0.05)", backgroundColor: "#171929" }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Детали</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4">
+          <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center" }}>Выберите событие<br/>для просмотра деталей</p>
+        </div>
+      </div>
+
+      </div>{/* end main flex row */}
 
       {/* ── Legend footer ── */}
       <div className="flex-shrink-0 flex items-center justify-center gap-6 py-3"
@@ -684,24 +712,27 @@ function EntityRow({
       {days.map(day => {
         const dateStr = format(day, "yyyy-MM-dd");
         const cellEvents = getEventsForCell(entity.id, dateStr);
+        const wknd = isWeekend(day);
         const key = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
         const firstEv = cellEvents[0];
+        const emptyColor = wknd ? "#121224" : "#141626";
         const tileColor = isDragTarget
-          ? "rgba(240,96,96,0.35)"
+          ? "rgba(240,96,96,0.3)"
           : firstEv
             ? STATUS_COLORS[firstEv.status]
-            : "#111320";
+            : emptyColor;
         return (
           <td key={dateStr}
             style={{
               backgroundColor: tileColor,
               borderRadius: "3px",
               padding: 0,
-              height: "26px",
+              height: "24px",
+              width: "24px",
               verticalAlign: "middle",
-              opacity: (firstEv?.done && !isDragTarget) ? 0.38 : 1,
-              transition: "background-color 0.12s",
+              opacity: (firstEv?.done && !isDragTarget) ? 0.35 : 1,
+              transition: "background-color 0.1s",
             }}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}
@@ -969,15 +1000,20 @@ function GridCell({
   const showCard = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHoverCard(true); };
   const hideCard = () => { hoverTimer.current = setTimeout(() => setHoverCard(false), 80); };
 
-  /* ── Empty cell — td is the dark tile, this is just the click zone ── */
+  /* ── Empty cell — td is the dark tile, hover overlay shows on top ── */
   if (events.length === 0) {
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
         onMouseEnter={onCellEnter}
         onMouseLeave={onCellLeave}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        style={{ width: "100%", height: "100%", cursor: "pointer" }}
-      />
+        className="group/empty"
+        style={{ width: "100%", height: "100%", cursor: "pointer", position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="absolute inset-0 opacity-0 group-hover/empty:opacity-100 transition-opacity duration-100"
+          style={{ backgroundColor: "rgba(255,255,255,0.09)", borderRadius: "3px" }}/>
+        <Plus className="w-2 h-2 opacity-0 group-hover/empty:opacity-40 transition-opacity duration-100 relative z-10"
+          style={{ color: "#fff" }}/>
+      </div>
     );
   }
 
@@ -1026,8 +1062,8 @@ function GridCell({
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
         draggable
-        onMouseEnter={() => { onCellEnter(); hoveredEventForCopy = first; showCard(); }}
-        onMouseLeave={() => { onCellLeave(); hoveredEventForCopy = null; hideCard(); }}
+        onMouseEnter={e => { onCellEnter(); hoveredEventForCopy = first; showCard(); (e.currentTarget as HTMLElement).style.filter = "brightness(1.25)"; }}
+        onMouseLeave={e => { onCellLeave(); hoveredEventForCopy = null; hideCard(); (e.currentTarget as HTMLElement).style.filter = ""; }}
         onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHoverCard(false); }}
         onDragEnd={onDragEnd}
         onClick={e => {
@@ -1038,6 +1074,7 @@ function GridCell({
         style={{
           width: "100%", height: "100%",
           cursor: "grab",
+          transition: "filter 0.1s",
           outline: copiedEventId === first.id ? "1px solid rgba(125,211,252,0.6)" : "none",
           outlineOffset: "-1px",
         }}
