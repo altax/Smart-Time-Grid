@@ -67,7 +67,7 @@ export default function Home() {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [newEntityName, setNewEntityName] = useState("");
   const [showAddRow,  setShowAddRow] = useState(false);
-  const [dayPanel,    setDayPanel]   = useState<string | null>(null);
+  const [dayPanel,    setDayPanel]   = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
 
   const addRowRef  = useRef<HTMLInputElement>(null);
   const popupRef   = useRef<HTMLDivElement>(null);
@@ -95,7 +95,7 @@ export default function Home() {
   /* global Escape / outside-click */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); setDayPanel(null); }
+      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); }
     };
     const onDown = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) setPopup(null);
@@ -330,6 +330,16 @@ export default function Home() {
         </table>
       </div>
 
+      {/* ── Horizontal Day Timeline ── always visible, switches day on header click ── */}
+      {entities.length > 0 && (
+        <HorizontalTimeline
+          date={dayPanel}
+          entities={entities}
+          getEventsForCell={getEventsForCell}
+          onDayReset={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
+        />
+      )}
+
       {/* ── Status bar ── */}
       <footer className="flex items-center gap-5 px-5 py-2 border-t border-border flex-shrink-0 text-xs text-muted-foreground">
         {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
@@ -346,16 +356,6 @@ export default function Home() {
         </div>
         <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
       </footer>
-
-      {/* ── Day Timeline Panel ── */}
-      {dayPanel && (
-        <DayTimelinePanel
-          date={dayPanel}
-          entities={entities}
-          getEventsForCell={getEventsForCell}
-          onClose={() => setDayPanel(null)}
-        />
-      )}
 
       {/* ── Popup ── */}
       {popup && (
@@ -532,6 +532,149 @@ function EntityRow({
         }
       </td>
     </tr>
+  );
+}
+
+/* ─────────────────────── HorizontalTimeline ─────────────────────── */
+function HorizontalTimeline({
+  date, entities, getEventsForCell, onDayReset,
+}: {
+  date: string;
+  entities: Entity[];
+  getEventsForCell: (entityId: string, date: string) => PlannerEvent[];
+  onDayReset: () => void;
+}) {
+  const now      = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+  const isToday  = date === todayStr;
+  const nowPct   = isToday ? ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100 : null;
+
+  const dateLabel = (() => {
+    try {
+      const d = parseISO(date);
+      if (isToday) return "Сегодня";
+      return format(d, "d MMMM, EEEE", { locale: ru });
+    } catch { return date; }
+  })();
+
+  function pct(t: string) {
+    try {
+      const [h, m] = t.split(":").map(Number);
+      return ((h * 60 + m) / 1440) * 100;
+    } catch { return 0; }
+  }
+
+  /* total busy minutes per entity */
+  function busyMins(entity: Entity) {
+    return getEventsForCell(entity.id, date)
+      .filter(ev => ev.startTime && ev.endTime)
+      .reduce((acc, ev) => {
+        const [sh, sm] = ev.startTime!.split(":").map(Number);
+        const [eh, em] = ev.endTime!.split(":").map(Number);
+        return acc + (eh * 60 + em) - (sh * 60 + sm);
+      }, 0);
+  }
+
+  const LABEL_W = 148; // px for entity name column
+
+  return (
+    <div className="border-t border-border bg-card flex-shrink-0 px-4 pt-2 pb-1.5 select-none">
+      {/* ── Header row: label + 24-h axis ── */}
+      <div className="flex items-center mb-1" style={{ gap: 0 }}>
+        {/* Date label + today button */}
+        <div className="flex items-center gap-2 flex-shrink-0" style={{ width: LABEL_W }}>
+          <button
+            onClick={onDayReset}
+            className={`text-[10px] font-semibold uppercase tracking-wider transition-colors
+              ${isToday ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+            title="Вернуться к сегодня">
+            {dateLabel}
+          </button>
+        </div>
+
+        {/* Hour markers */}
+        <div className="flex-1 relative h-4">
+          {[0, 3, 6, 9, 12, 15, 18, 21, 24].map(h => (
+            <span key={h}
+              className="absolute text-[8px] text-muted-foreground/40 font-mono leading-none -translate-x-1/2"
+              style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
+              {h}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Entity rows ── */}
+      {entities.map(entity => {
+        const evs  = getEventsForCell(entity.id, date);
+        const timedEvs   = evs.filter(ev => ev.startTime && ev.endTime);
+        const untimedEvs = evs.filter(ev => !ev.startTime);
+        const busy = busyMins(entity);
+        const busyLabel = busy > 0
+          ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""}`
+          : null;
+
+        return (
+          <div key={entity.id} className="flex items-center mb-1" style={{ gap: 0 }}>
+            {/* Entity name */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 pr-2" style={{ width: LABEL_W }}>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
+              <span className="text-[10px] text-muted-foreground truncate leading-none">{entity.name}</span>
+              {busyLabel && (
+                <span className="text-[9px] font-semibold ml-auto flex-shrink-0"
+                  style={{ color: entity.color }}>{busyLabel}</span>
+              )}
+              {untimedEvs.length > 0 && (
+                <span className="text-[8px] text-muted-foreground/50 flex-shrink-0">+{untimedEvs.length}</span>
+              )}
+            </div>
+
+            {/* Timeline track */}
+            <div className="flex-1 relative h-5 rounded overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+
+              {/* Hour grid lines */}
+              {[3, 6, 9, 12, 15, 18, 21].map(h => (
+                <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
+                  style={{ left: `${(h / 24) * 100}%`, backgroundColor: h % 6 === 0 ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)" }}/>
+              ))}
+
+              {/* Event blocks */}
+              {timedEvs.map(ev => {
+                const l = pct(ev.startTime!);
+                const w = Math.max(pct(ev.endTime!) - l, 0.4);
+                const color = STATUS_COLORS[ev.status];
+                const dur   = calcDuration(ev.startTime!, ev.endTime!);
+                return (
+                  <div key={ev.id}
+                    className="absolute top-0.5 bottom-0.5 rounded-sm group/bar cursor-default"
+                    style={{ left: `${l}%`, width: `${w}%`, backgroundColor: color }}
+                    title={`${ev.title} · ${ev.startTime}–${ev.endTime} (${dur})`}>
+                    {/* Tooltip on hover */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/bar:flex
+                      flex-col items-center pointer-events-none z-50 whitespace-nowrap">
+                      <div className="bg-popover border border-border rounded-lg px-2.5 py-1.5 shadow-xl">
+                        <p className="text-[10px] font-semibold text-foreground leading-tight">{ev.title}</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5">{ev.startTime} – {ev.endTime} · {dur}</p>
+                      </div>
+                      <div className="w-1.5 h-1.5 bg-popover border-r border-b border-border rotate-45 -mt-1"/>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Current-time red needle */}
+              {nowPct !== null && (
+                <div className="absolute top-0 bottom-0 w-0.5 rounded-full bg-red-400 z-10 pointer-events-none"
+                  style={{ left: `${nowPct}%` }}>
+                  <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-400"/>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
