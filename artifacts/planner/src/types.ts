@@ -6,6 +6,18 @@ export interface Entity {
   color: string;
 }
 
+export type EventIcon = "none" | "gym" | "ozon" | "briefcase" | "star" | "car" | "food";
+
+export const EVENT_ICON_LABELS: Record<EventIcon, string> = {
+  none:      "—",
+  gym:       "Качалка",
+  ozon:      "Озон ПВЗ",
+  briefcase: "Работа",
+  star:      "Важное",
+  car:       "Поездка",
+  food:      "Еда",
+};
+
 export interface PlannerEvent {
   id: string;
   entityId: string;
@@ -16,6 +28,7 @@ export interface PlannerEvent {
   notes?: string;
   startTime?: string; // "HH:MM"
   endTime?: string;   // "HH:MM"
+  icon?: EventIcon;
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {

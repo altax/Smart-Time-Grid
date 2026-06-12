@@ -7,13 +7,77 @@ import { ru } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, X, Check,
   Pencil, Trash2, RotateCcw, Sparkles, Clock, GripVertical,
+  Dumbbell, Briefcase, Star, Car, UtensilsCrossed,
 } from "lucide-react";
 import { usePlanner } from "../hooks/use-planner";
 import {
-  Entity, PlannerEvent, EventStatus,
+  Entity, PlannerEvent, EventStatus, EventIcon,
   STATUS_COLORS, STATUS_LABELS, STATUS_CYCLE,
+  EVENT_ICON_LABELS,
   calcDuration, fmtTime,
 } from "../types";
+
+/* ── Ozon PVZ icon ── */
+function OzonIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="24" height="24" rx="5" fill="#005BFF"/>
+      <text x="12" y="17" textAnchor="middle" fill="white"
+        fontSize="13" fontWeight="900" fontFamily="Arial,sans-serif" letterSpacing="-1">O</text>
+    </svg>
+  );
+}
+
+/* ── Icon registry ── */
+const EVENT_ICONS: Record<EventIcon, React.ReactNode> = {
+  none:      null,
+  gym:       <Dumbbell className="w-full h-full"/>,
+  ozon:      <OzonIcon size={14}/>,
+  briefcase: <Briefcase className="w-full h-full"/>,
+  star:      <Star className="w-full h-full"/>,
+  car:       <Car className="w-full h-full"/>,
+  food:      <UtensilsCrossed className="w-full h-full"/>,
+};
+
+const ICON_LIST: EventIcon[] = ["none","gym","ozon","briefcase","star","car","food"];
+
+/* ── Inline icon renderer (white, size controlled by parent) ── */
+function EventIconBadge({ icon, size = 10 }: { icon: EventIcon; size?: number }) {
+  if (!icon || icon === "none") return null;
+  if (icon === "ozon") return <OzonIcon size={size}/>;
+  return (
+    <span className="text-white/90 flex items-center justify-center"
+      style={{ width: size, height: size }}>
+      {EVENT_ICONS[icon]}
+    </span>
+  );
+}
+
+/* ── Icon picker row ── */
+function IconPicker({ value, onChange }: { value: EventIcon; onChange: (v: EventIcon) => void }) {
+  return (
+    <div>
+      <p className="text-[10px] text-muted-foreground mb-1.5">Иконка</p>
+      <div className="flex flex-wrap gap-1.5">
+        {ICON_LIST.map(ic => (
+          <button key={ic} onClick={() => onChange(ic)}
+            title={EVENT_ICON_LABELS[ic]}
+            className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all
+              ${value === ic ? "border-primary bg-primary/15 scale-110" : "border-border hover:border-border/80 hover:bg-accent"}`}>
+            {ic === "none"
+              ? <span className="text-[10px] text-muted-foreground font-medium">—</span>
+              : ic === "ozon"
+                ? <OzonIcon size={16}/>
+                : <span className="text-foreground w-4 h-4 flex items-center justify-center">
+                    {EVENT_ICONS[ic]}
+                  </span>
+            }
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function genId() { return Math.random().toString(36).substring(2, 12); }
 
@@ -229,7 +293,7 @@ export default function Home() {
                 return (
                   <th key={day.toISOString()}
                     ref={tod ? todayThRef : undefined}
-                    onClick={() => setDayPanel(active ? null : ds)}
+                    onClick={() => setDayPanel(active ? format(new Date(), "yyyy-MM-dd") : ds)}
                     className={`border-b border-border py-1.5 text-center align-bottom cursor-pointer transition-colors
                       hover:bg-primary/10
                       ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-primary" : ""}`}>
@@ -592,19 +656,26 @@ function HorizontalTimeline({
           </button>
         </div>
 
-        {/* Hour markers — tick every hour, label every 3 */}
-        <div className="flex-1 relative h-4">
-          {Array.from({ length: 25 }, (_, h) => (
-            <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
-              style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
-              {/* label only every 3h */}
-              {h % 3 === 0 && (
-                <span className="text-[8px] text-muted-foreground/50 font-mono leading-none mb-0.5">{h}</span>
-              )}
-              {/* tick mark for every hour */}
-              <div className={`w-px ${h % 6 === 0 ? "h-2 bg-border/60" : h % 3 === 0 ? "h-1.5 bg-border/40" : "h-1 bg-border/20"}`}/>
-            </div>
-          ))}
+        {/* Hour markers — staggered: even on top row, odd on bottom row → all 24 fit */}
+        <div className="flex-1 relative h-6">
+          {Array.from({ length: 25 }, (_, h) => {
+            const isEven = h % 2 === 0;
+            const isMajor = h % 6 === 0;
+            const isMid   = h % 2 === 0 && !isMajor;
+            return (
+              <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
+                style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
+                {/* Number: even on row 0, odd on row 1 */}
+                <span
+                  className={`font-mono leading-none ${isMajor ? "text-muted-foreground/70" : "text-muted-foreground/45"}`}
+                  style={{ fontSize: 7, marginTop: isEven ? 0 : 8 }}>
+                  {h < 24 ? h : 24}
+                </span>
+                {/* Tick below number */}
+                <div className={`w-px mt-0.5 ${isMajor ? "h-2 bg-border/55" : isMid ? "h-1.5 bg-border/35" : "h-1 bg-border/20"}`}/>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -658,14 +729,23 @@ function HorizontalTimeline({
                 const dur   = calcDuration(ev.startTime!, ev.endTime!);
                 return (
                   <div key={ev.id}
-                    className="absolute top-0.5 bottom-0.5 rounded-sm group/bar cursor-default"
+                    className="absolute top-0.5 bottom-0.5 rounded-sm group/bar cursor-default overflow-hidden"
                     style={{ left: `${l}%`, width: `${w}%`, backgroundColor: color }}
                     title={`${ev.title} · ${ev.startTime}–${ev.endTime} (${dur})`}>
+                    {/* Icon inside bar (only when wide enough) */}
+                    {ev.icon && ev.icon !== "none" && w > 2 && (
+                      <span className="absolute left-0.5 top-1/2 -translate-y-1/2 opacity-90">
+                        <EventIconBadge icon={ev.icon} size={11}/>
+                      </span>
+                    )}
                     {/* Tooltip on hover */}
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/bar:flex
                       flex-col items-center pointer-events-none z-50 whitespace-nowrap">
                       <div className="bg-popover border border-border rounded-lg px-2.5 py-1.5 shadow-xl">
-                        <p className="text-[10px] font-semibold text-foreground leading-tight">{ev.title}</p>
+                        <div className="flex items-center gap-1.5">
+                          {ev.icon && ev.icon !== "none" && <EventIconBadge icon={ev.icon} size={11}/>}
+                          <p className="text-[10px] font-semibold text-foreground leading-tight">{ev.title}</p>
+                        </div>
                         <p className="text-[9px] text-muted-foreground mt-0.5">{ev.startTime} – {ev.endTime} · {dur}</p>
                       </div>
                       <div className="w-1.5 h-1.5 bg-popover border-r border-b border-border rotate-45 -mt-1"/>
@@ -953,12 +1033,18 @@ function GridCell({
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
         className="flex flex-col items-center gap-[3px] cursor-grab active:cursor-grabbing group/ev">
 
-        {/* ── Status square ── clean, no text inside ── */}
+        {/* ── Status square ── clean, icon overlay bottom-right ── */}
         <div
           className="w-7 h-7 rounded relative transition-all
             group-hover/ev:brightness-110 group-hover/ev:scale-110
             group-active/ev:scale-95 group-active/ev:opacity-60"
           style={{ backgroundColor: color }}>
+          {/* Icon overlay */}
+          {first.icon && first.icon !== "none" && (
+            <span className="absolute bottom-0.5 right-0.5 w-3 h-3 flex items-center justify-center">
+              <EventIconBadge icon={first.icon} size={10}/>
+            </span>
+          )}
           {/* Multi-event badge */}
           {events.length > 1 && (
             <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background border border-border
@@ -1096,6 +1182,7 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime,   setEndTime]   = useState("10:00");
   const [useTime,   setUseTime]   = useState(false);
+  const [icon,      setIcon]      = useState<EventIcon>("none");
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -1114,6 +1201,7 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
       notes: notes.trim() || undefined,
       startTime: useTime ? startTime : undefined,
       endTime:   useTime ? endTime   : undefined,
+      icon: icon !== "none" ? icon : undefined,
     });
   };
 
@@ -1196,6 +1284,8 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
             value={notes} onChange={e => setNotes(e.target.value)}
             placeholder="Заметки (необязательно)" rows={2}
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors resize-none"/>
+
+          <IconPicker value={icon} onChange={setIcon}/>
         </div>
 
         <button data-testid="btn-save-event" onClick={submit} disabled={!title.trim()}
@@ -1223,6 +1313,7 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPop
   const [editNotes,    setEditNotes]    = useState(event.notes ?? "");
   const [startTime,    setStartTime]    = useState(event.startTime ?? "");
   const [endTime,      setEndTime]      = useState(event.endTime ?? "");
+  const [editIcon,     setEditIcon]     = useState<EventIcon>(event.icon ?? "none");
   const [dirty, setDirty] = useState(false);
 
   const dateLabel = (() => {
@@ -1243,6 +1334,7 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPop
       notes:     editNotes.trim() || undefined,
       startTime: startTime || undefined,
       endTime:   endTime   || undefined,
+      icon:      editIcon !== "none" ? editIcon : undefined,
     });
   };
 
@@ -1304,6 +1396,8 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPop
             placeholder="Заметки..."
             rows={2}
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors resize-none"/>
+
+          <IconPicker value={editIcon} onChange={v => { setEditIcon(v); mark(); }}/>
         </div>
 
         {/* Quick status */}
