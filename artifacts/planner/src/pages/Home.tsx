@@ -428,13 +428,6 @@ export default function Home() {
               </tr>
             )}
 
-            {entities.length > 0 && (
-              <DaySummaryRow
-                days={days}
-                entities={entities}
-                getAllEventsForDay={getAllEventsForDay}/>
-            )}
-
             {entities.map(entity => (
               <EntityRow
                 key={entity.id}
@@ -510,6 +503,15 @@ export default function Home() {
         </table>
       </div>
 
+      {/* ── Day schedule panel ── */}
+      {entities.length > 0 && (
+        <HorizontalTimeline
+          date={dayPanel}
+          entities={entities}
+          getEventsForCell={getEventsForCell}
+          onDayReset={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
+        />
+      )}
 
       {/* ── Status bar ── */}
       <footer className="border-t border-border flex-shrink-0">
@@ -882,40 +884,39 @@ function HorizontalTimeline({
       }, 0);
   }
 
-  const LABEL_W = 148; // px for entity name column
+  const LABEL_W = 160; // px for entity name column
 
   return (
-    <div className="border-t border-border bg-card flex-shrink-0 px-4 pt-2 pb-1.5 select-none">
+    <div className="border-t-2 border-border bg-card flex-shrink-0 px-4 pt-3 pb-2 select-none">
       {/* ── Header row: label + 24-h axis ── */}
-      <div className="flex items-center mb-1" style={{ gap: 0 }}>
-        {/* Date label + today button */}
+      <div className="flex items-center mb-2" style={{ gap: 0 }}>
+        {/* Date label */}
         <div className="flex items-center gap-2 flex-shrink-0" style={{ width: LABEL_W }}>
+          <CalendarDays className="w-3.5 h-3.5 text-primary/60 flex-shrink-0"/>
           <button
             onClick={onDayReset}
-            className={`text-[10px] font-semibold uppercase tracking-wider transition-colors
+            className={`text-[11px] font-bold uppercase tracking-wide transition-colors
               ${isToday ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
             title="Вернуться к сегодня">
             {dateLabel}
           </button>
         </div>
 
-        {/* Hour markers — staggered: even on top row, odd on bottom row → all 24 fit */}
+        {/* Hour markers 0–24 */}
         <div className="flex-1 relative h-6">
           {Array.from({ length: 25 }, (_, h) => {
-            const isEven = h % 2 === 0;
+            const isEven  = h % 2 === 0;
             const isMajor = h % 6 === 0;
             const isMid   = h % 2 === 0 && !isMajor;
             return (
               <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
                 style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
-                {/* Number: even on row 0, odd on row 1 */}
                 <span
-                  className={`font-mono leading-none ${isMajor ? "text-muted-foreground/70" : "text-muted-foreground/45"}`}
-                  style={{ fontSize: 7, marginTop: isEven ? 0 : 8 }}>
-                  {h < 24 ? h : 24}
+                  className={`font-mono leading-none ${isMajor ? "text-muted-foreground/80 text-[9px]" : "text-muted-foreground/45 text-[7px]"}`}
+                  style={{ marginTop: isEven ? 0 : 9 }}>
+                  {h < 24 ? h : ""}
                 </span>
-                {/* Tick below number */}
-                <div className={`w-px mt-0.5 ${isMajor ? "h-2 bg-border/55" : isMid ? "h-1.5 bg-border/35" : "h-1 bg-border/20"}`}/>
+                <div className={`w-px mt-0.5 ${isMajor ? "h-2.5 bg-border/60" : isMid ? "h-1.5 bg-border/35" : "h-1 bg-border/20"}`}/>
               </div>
             );
           })}
@@ -924,32 +925,38 @@ function HorizontalTimeline({
 
       {/* ── Entity rows ── */}
       {entities.map(entity => {
-        const evs  = getEventsForCell(entity.id, date);
+        const evs        = getEventsForCell(entity.id, date);
         const timedEvs   = evs.filter(ev => ev.startTime && ev.endTime);
         const untimedEvs = evs.filter(ev => !ev.startTime);
-        const busy = busyMins(entity);
-        const busyLabel = busy > 0
-          ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""}`
+        const busy       = busyMins(entity);
+        const busyLabel  = busy > 0
+          ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""} занято`
           : null;
+        const freeLabel  = busy > 0
+          ? `${Math.floor((960 - Math.min(busy, 960)) / 60)}ч св.`
+          : "свободен";
 
         return (
-          <div key={entity.id} className="flex items-center mb-1" style={{ gap: 0 }}>
+          <div key={entity.id} className="flex items-center mb-2" style={{ gap: 0 }}>
             {/* Entity name */}
-            <div className="flex items-center gap-1.5 flex-shrink-0 pr-2" style={{ width: LABEL_W }}>
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
-              <span className="text-[10px] text-muted-foreground truncate leading-none">{entity.name}</span>
-              {busyLabel && (
-                <span className="text-[9px] font-semibold ml-auto flex-shrink-0"
-                  style={{ color: entity.color }}>{busyLabel}</span>
-              )}
-              {untimedEvs.length > 0 && (
-                <span className="text-[8px] text-muted-foreground/50 flex-shrink-0">+{untimedEvs.length}</span>
-              )}
+            <div className="flex items-center gap-2 flex-shrink-0 pr-3" style={{ width: LABEL_W }}>
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
+              <span className="text-[11px] font-medium text-foreground/80 truncate leading-none">{entity.name}</span>
+              <div className="ml-auto flex-shrink-0 text-right">
+                {busyLabel ? (
+                  <span className="text-[9px] font-semibold block" style={{ color: entity.color }}>{busyLabel}</span>
+                ) : (
+                  <span className="text-[9px] text-muted-foreground/40 block">{freeLabel}</span>
+                )}
+                {untimedEvs.length > 0 && (
+                  <span className="text-[8px] text-muted-foreground/40 block">+{untimedEvs.length} без вр.</span>
+                )}
+              </div>
             </div>
 
             {/* Timeline track */}
-            <div className="flex-1 relative h-5 rounded overflow-hidden"
-              style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+            <div className="flex-1 relative h-8 rounded-md overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
 
               {/* Hour grid lines — every hour */}
               {Array.from({ length: 23 }, (_, i) => i + 1).map(h => (
