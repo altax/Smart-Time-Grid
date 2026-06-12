@@ -17,7 +17,16 @@ import {
 
 function genId() { return Math.random().toString(36).substring(2, 12); }
 
-/** Convert "HH:MM" to 0-100 percentage of 24-hour day */
+/** Convert "HH:MM" to 0–100% within a 6:00–22:00 window for the time strip */
+function workPct(t: string): number {
+  try {
+    const [h, m] = t.split(":").map(Number);
+    const min = h * 60 + m;
+    return Math.max(0, Math.min(100, ((min - 360) / 960) * 100)); // 360=6h, 960=16h span
+  } catch { return 0; }
+}
+
+/** Full 24-hour pct for the tooltip timeline */
 function timePct(t: string): number {
   try {
     const [h, m] = t.split(":").map(Number);
@@ -533,8 +542,8 @@ function GridCell({
   const [hovering, setHovering] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showTip  = () => { if (hideTimer.current) clearTimeout(hideTimer.current); setHovering(true); };
-  const hideTip  = () => { hideTimer.current = setTimeout(() => setHovering(false), 120); };
+  const showTip = () => { if (hideTimer.current) clearTimeout(hideTimer.current); setHovering(true); };
+  const hideTip = () => { hideTimer.current = setTimeout(() => setHovering(false), 150); };
 
   if (events.length === 0) {
     return (
@@ -552,31 +561,14 @@ function GridCell({
   const dur     = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
   const color   = STATUS_COLORS[first.status];
 
-  /* ── timed cell: taller card with start / mini-bar / duration / end ── */
-  const timedCell = hasTime && (
-    <div className="flex flex-col items-stretch px-0.5 pt-0.5 pb-0.5 gap-[2px] h-full">
-      {/* start time */}
-      <span className="text-[7px] font-bold text-white/95 leading-none text-center tracking-tight">
-        {fmtTime(first.startTime!)}
-      </span>
-      {/* mini 24-hour bar */}
-      <div className="relative h-[5px] rounded-full bg-black/30 mx-0.5 overflow-hidden flex-shrink-0">
-        <div className="absolute h-full rounded-full bg-white/80"
-          style={{ left: `${timePct(first.startTime!)}%`, width: `${timePct(first.endTime!) - timePct(first.startTime!)}%` }}/>
-      </div>
-      {/* duration */}
-      <span className="text-[6px] font-extrabold text-white leading-none text-center tracking-tight">
-        {dur}
-      </span>
-      {/* end time */}
-      <span className="text-[7px] font-bold text-white/75 leading-none text-center tracking-tight">
-        {fmtTime(first.endTime!)}
-      </span>
-    </div>
-  );
+  /* strip metrics */
+  const stripStart = hasTime ? workPct(first.startTime!) : 0;
+  const stripEnd   = hasTime ? workPct(first.endTime!)   : 0;
+  const stripW     = Math.max(5, stripEnd - stripStart);
 
   return (
     <>
+      {/* Outer wrapper: square + optional time strip */}
       <div ref={ref}
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
@@ -590,19 +582,34 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className={`relative cursor-grab active:cursor-grabbing rounded overflow-visible
-          transition-all hover:brightness-115 active:scale-95 active:opacity-60
-          ${hasTime ? "w-8 h-[52px]" : "w-7 h-7 hover:scale-110"}`}
-        style={{ backgroundColor: color }}>
+        className="flex flex-col items-center gap-[3px] cursor-grab active:cursor-grabbing group/ev">
 
-        {hasTime ? timedCell : null}
+        {/* ── Status square ── clean, no text inside ── */}
+        <div
+          className="w-7 h-7 rounded relative transition-all
+            group-hover/ev:brightness-110 group-hover/ev:scale-110
+            group-active/ev:scale-95 group-active/ev:opacity-60"
+          style={{ backgroundColor: color }}>
+          {/* Multi-event badge */}
+          {events.length > 1 && (
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background border border-border
+              text-[7px] font-bold flex items-center justify-center text-foreground z-10">
+              {events.length}
+            </span>
+          )}
+        </div>
 
-        {/* Multi-event badge */}
-        {events.length > 1 && (
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background border border-border
-            text-[7px] font-bold flex items-center justify-center text-foreground z-10">
-            {events.length}
-          </span>
+        {/* ── Time strip: track + coloured block showing position in 6–22 h window ── */}
+        {hasTime && (
+          <div className="relative w-7 h-[5px] rounded-full overflow-hidden"
+            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
+            {/* Noon reference tick */}
+            <div className="absolute top-0 bottom-0 w-px"
+              style={{ left: `${workPct("12:00")}%`, backgroundColor: "rgba(255,255,255,0.18)" }}/>
+            {/* Event block */}
+            <div className="absolute top-0 h-full rounded-full"
+              style={{ left: `${stripStart}%`, width: `${stripW}%`, backgroundColor: color, opacity: 0.9 }}/>
+          </div>
         )}
       </div>
 
