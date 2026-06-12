@@ -114,6 +114,8 @@ const MONTH_NAMES = [
 
 /* Module-level drag state — no re-renders needed */
 let activeDrag: { eventId: string; srcEntityId: string; srcDate: string } | null = null;
+/* Module-level tooltip gate — only ONE tooltip visible at any time */
+let tooltipOwnerId: string | null = null;
 
 type CtxMenu = { x: number; y: number; event: PlannerEvent } | null;
 type Popup =
@@ -163,6 +165,21 @@ export default function Home() {
     });
     return () => cancelAnimationFrame(id);
   }, [currentMonth]);
+
+  /* Wheel → horizontal scroll (hide scrollbar, use wheel instead) */
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (e.deltaX !== 0) return;           // native horizontal gesture — pass through
+      if (Math.abs(e.deltaY) > 2) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY * 1.8;
+      }
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, []);
 
   /* global Escape / outside-click */
   useEffect(() => {
@@ -231,6 +248,24 @@ export default function Home() {
   const pendingN      = events.filter(e => e.status === "pending").length;
   const totalEarnings = events.reduce((s, e) => s + (e.earnings ?? 0), 0);
   const dayEarnings   = events.filter(e => e.date === dayPanel).reduce((s, e) => s + (e.earnings ?? 0), 0);
+
+  /* Week grouping — split days into Mon-Sun chunks */
+  const weekGroups = (() => {
+    const groups: Date[][] = [];
+    let cur: Date[] = [];
+    days.forEach(d => {
+      if (d.getDay() === 1 && cur.length) { groups.push(cur); cur = []; }
+      cur.push(d);
+    });
+    if (cur.length) groups.push(cur);
+    return groups;
+  })();
+
+  const weekEarnings = (wDays: Date[]): number => {
+    const s = format(wDays[0], "yyyy-MM-dd");
+    const e = format(wDays[wDays.length - 1], "yyyy-MM-dd");
+    return events.filter(ev => ev.date >= s && ev.date <= e).reduce((sum, ev) => sum + (ev.earnings ?? 0), 0);
+  };
 
   /* popup position */
   function popupStyle(anchor: DOMRect, w = 300, h = 380): React.CSSProperties {
@@ -302,7 +337,7 @@ export default function Home() {
       </header>
 
       {/* ── Grid ── */}
-      <div ref={gridRef} className="flex-1 overflow-auto scrollbar-thin">
+      <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
         <table className="border-collapse" style={{ tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: 210, minWidth: 210 }}/>
@@ -311,21 +346,49 @@ export default function Home() {
           </colgroup>
 
           <thead className="sticky top-0 z-20">
+            {/* ── Week labels row ── */}
             <tr>
-              <th className="bg-card border-b border-r border-border px-3 py-2 text-left align-bottom">
+              <th className="bg-card border-b border-border/30 border-r border-border px-3"/>
+              {weekGroups.map(wDays => {
+                const isFirst = wDays === weekGroups[0];
+                const wEarn   = weekEarnings(wDays);
+                const label   = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
+                return (
+                  <th key={wDays[0].toISOString()} colSpan={wDays.length}
+                    className={`bg-card border-b border-border/30 py-0.5 px-1 text-center
+                      ${!isFirst ? "border-l-2 border-l-border/50" : ""}`}>
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      <span className="text-[8px] text-muted-foreground/50 font-medium">{label}</span>
+                      {wEarn > 0 && (
+                        <span className="text-[8px] font-bold text-emerald-400">
+                          {fmtMoney(wEarn)}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
+              <th className="bg-card border-b border-border/30 border-l border-border"/>
+            </tr>
+
+            {/* ── Day numbers row ── */}
+            <tr>
+              <th className="bg-card border-b border-r border-border px-3 py-1.5 text-left align-bottom">
                 <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Объект</span>
               </th>
               {days.map(day => {
-                const tod = isToday(day), wknd = isWeekend(day);
-                const ds = format(day, "yyyy-MM-dd");
+                const tod   = isToday(day), wknd = isWeekend(day);
+                const isMon = day.getDay() === 1;
+                const ds    = format(day, "yyyy-MM-dd");
                 const active = dayPanel === ds;
                 return (
                   <th key={day.toISOString()}
                     ref={tod ? todayThRef : undefined}
                     onClick={() => setDayPanel(active ? format(new Date(), "yyyy-MM-dd") : ds)}
-                    className={`border-b border-border py-1.5 text-center align-bottom cursor-pointer transition-colors
+                    className={`border-b border-border py-1 text-center align-bottom cursor-pointer transition-colors
                       hover:bg-primary/10
-                      ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-primary" : ""}`}>
+                      ${isMon ? "border-l-2 border-l-border/60" : ""}
+                      ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-b-primary" : ""}`}>
                     <div className="flex flex-col items-center gap-0.5">
                       <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full
                         ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/70" : "text-foreground"}`}>
@@ -389,10 +452,15 @@ export default function Home() {
               />
             ))}
 
-            {showAddRow && (
+            {/* ── Add entity row ── */}
+            {showAddRow ? (
               <tr>
-                <td colSpan={days.length + 2} className="px-3 py-2 border-t border-border/40">
-                  <div className="flex items-center gap-2 max-w-xs">
+                <td colSpan={days.length + 2}
+                  className="border-t-2 border-primary/30 bg-primary/5 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <Plus className="w-3.5 h-3.5 text-primary"/>
+                    </div>
                     <input ref={addRowRef} data-testid="input-new-entity"
                       value={newEntityName}
                       onChange={e => setNewEntityName(e.target.value)}
@@ -400,22 +468,34 @@ export default function Home() {
                         if (e.key === "Enter") handleAddEntity();
                         if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
                       }}
-                      placeholder="Название строки..."
-                      className="text-sm bg-transparent border-b border-primary outline-none flex-1 py-0.5 text-foreground placeholder:text-muted-foreground"/>
-                    <button onClick={handleAddEntity} className="text-xs text-primary hover:underline font-medium">Добавить</button>
-                    <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }} className="text-xs text-muted-foreground hover:text-foreground">Отмена</button>
+                      placeholder="Название объекта (Enter для добавления)..."
+                      className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50"/>
+                    <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground
+                        hover:bg-primary/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                      Добавить
+                    </button>
+                    <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                      <X className="w-3.5 h-3.5"/>
+                    </button>
                   </div>
                 </td>
               </tr>
-            )}
-
-            {entities.length > 0 && !showAddRow && (
+            ) : (
               <tr>
-                <td colSpan={days.length + 2} className="border-t border-border/20 px-3 py-1.5">
-                  <button data-testid="btn-add-row-footer" onClick={() => setShowAddRow(true)}
-                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors">
-                    <Plus className="w-3 h-3"/> Добавить строку
-                  </button>
+                <td colSpan={days.length + 2}
+                  onClick={() => setShowAddRow(true)}
+                  className="border-t border-dashed border-border/40 cursor-pointer group/add hover:bg-primary/5 transition-colors">
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <div className="w-5 h-5 rounded-md border-2 border-dashed border-border/40
+                      group-hover/add:border-primary/50 flex items-center justify-center transition-colors">
+                      <Plus className="w-3 h-3 text-muted-foreground/30 group-hover/add:text-primary/70 transition-colors"/>
+                    </div>
+                    <span className="text-xs text-muted-foreground/40 group-hover/add:text-primary/70 transition-colors">
+                      Добавить объект
+                    </span>
+                  </div>
                 </td>
               </tr>
             )}
@@ -425,20 +505,47 @@ export default function Home() {
 
 
       {/* ── Status bar ── */}
-      <footer className="flex items-center gap-5 px-5 py-2 border-t border-border flex-shrink-0 text-xs text-muted-foreground">
-        {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
-          <div key={s} className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS[s] }}/>
-            <span>{STATUS_LABELS[s]}</span>
+      <footer className="border-t border-border flex-shrink-0">
+        {/* Weekly earnings strip */}
+        {totalEarnings > 0 && (
+          <div className="flex items-center gap-0 px-5 py-1.5 border-b border-border/40 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            <span className="text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-wider mr-3 flex-shrink-0">По неделям</span>
+            <div className="flex items-center gap-2 flex-1">
+              {weekGroups.map((wDays, i) => {
+                const earn = weekEarnings(wDays);
+                const label = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d")}`;
+                return (
+                  <div key={i} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background/60 border border-border/30 flex-shrink-0">
+                    <span className="text-[9px] text-muted-foreground/50">{label}</span>
+                    <span className={`text-[9px] font-bold ${earn > 0 ? "text-emerald-400" : "text-muted-foreground/30"}`}>
+                      {earn > 0 ? fmtMoney(earn) : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 ml-3 flex-shrink-0">
+              <TrendingUp className="w-3 h-3 text-emerald-400"/>
+              <span className="text-[10px] font-bold text-emerald-400">{fmtMoney(totalEarnings)}</span>
+              <span className="text-[9px] text-emerald-400/60">за месяц</span>
+            </div>
           </div>
-        ))}
-        <div className="ml-auto flex items-center gap-4">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.overdue }}/>{overdueN}</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.confirmed }}/>{confirmedN}</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.pending }}/>{pendingN}</span>
-          <span className="border-l border-border pl-4">Всего: <strong className="text-foreground">{events.length}</strong></span>
+        )}
+        <div className="flex items-center gap-5 px-5 py-2 text-xs text-muted-foreground">
+          {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
+            <div key={s} className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS[s] }}/>
+              <span>{STATUS_LABELS[s]}</span>
+            </div>
+          ))}
+          <div className="ml-auto flex items-center gap-4">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.overdue }}/>{overdueN}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.confirmed }}/>{confirmedN}</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.pending }}/>{pendingN}</span>
+            <span className="border-l border-border pl-4">Всего: <strong className="text-foreground">{events.length}</strong></span>
+          </div>
+          <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
         </div>
-        <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
       </footer>
 
       {/* ── Popup ── */}
@@ -613,9 +720,11 @@ function EntityRow({
         const key = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
 
+        const isMon = day.getDay() === 1;
         return (
           <td key={dateStr}
             className={`px-0.5 py-[3px] transition-all
+              ${isMon ? "border-l-2 border-l-border/40" : ""}
               ${wknd ? "bg-white/[0.012]" : ""}
               ${tod  ? "bg-primary/[0.07]" : ""}
               ${isDragTarget ? "bg-primary/20 ring-1 ring-inset ring-primary/40 rounded" : ""}`}
@@ -1038,29 +1147,32 @@ function GridCell({
   onAddClick, onEventClick, onContextMenu, onShiftClick,
   onDragStart, onDragEnd,
 }: GridCellProps) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref      = useRef<HTMLDivElement>(null);
   const [hovering, setHovering] = useState(false);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tipId    = `${entityId}__${date}`;
 
-  const showTip = () => { if (hideTimer.current) clearTimeout(hideTimer.current); setHovering(true); };
-  const hideTip = () => { hideTimer.current = setTimeout(() => setHovering(false), 150); };
+  const showTip = () => {
+    tooltipOwnerId = tipId;
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setHovering(true);
+  };
+  const hideTip = () => {
+    hideTimer.current = setTimeout(() => setHovering(false), 60);
+  };
 
+  /* ── Empty cell ── */
   if (events.length === 0) {
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className="group/c w-full flex flex-col items-center gap-[3px] py-0.5 cursor-pointer rounded
-          hover:bg-white/[0.04] transition-all">
-        {/* Empty status indicator */}
-        <div className="w-[18px] h-[18px] rounded border border-transparent
-          group-hover/c:border-border/60 flex items-center justify-center transition-all">
-          <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/40 transition-colors"/>
+        className="group/c w-full flex flex-col gap-[3px] py-1 cursor-pointer rounded transition-all">
+        {/* Track placeholder */}
+        <div className="w-full h-[12px] rounded-sm transition-all
+          group-hover/c:bg-white/[0.06]"
+          style={{ backgroundColor: "rgba(255,255,255,0.025)" }}>
+          <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/25 mx-auto mt-[1px] transition-colors"/>
         </div>
-        {/* Empty time track */}
-        <div className="w-full h-[9px] rounded-sm"
-          style={{ backgroundColor: "rgba(255,255,255,0.025)" }}/>
-        {/* Spacer for alignment */}
-        <span className="text-[7px] leading-none opacity-0 select-none">0</span>
       </div>
     );
   }
@@ -1071,13 +1183,15 @@ function GridCell({
   const color   = STATUS_COLORS[first.status];
 
   /* time bar metrics within 6–22h window */
-  const stripStart = hasTime ? workPct(first.startTime!) : 0;
-  const stripEnd   = hasTime ? workPct(first.endTime!)   : 0;
-  const stripW     = Math.max(5, stripEnd - stripStart);
+  const barLeft = hasTime ? workPct(first.startTime!) : 0;
+  const barEnd  = hasTime ? workPct(first.endTime!)   : 100;
+  const barW    = Math.max(6, barEnd - barLeft);
+
+  /* earnings display */
+  const earn = first.earnings ?? 0;
 
   return (
     <>
-      {/* ── Cell: indicator + time bar + label ── */}
       <div ref={ref}
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
@@ -1091,56 +1205,65 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className="flex flex-col items-center gap-[3px] w-full py-0.5 cursor-grab active:cursor-grabbing group/ev">
+        className="flex flex-col gap-[3px] w-full py-1 cursor-grab active:cursor-grabbing group/ev
+          rounded transition-all group-hover/ev:bg-white/[0.03]">
 
-        {/* ── Status dot ── */}
-        <div
-          className="w-[18px] h-[18px] rounded relative flex-shrink-0 transition-all
-            group-hover/ev:brightness-110 group-hover/ev:scale-110
-            group-active/ev:scale-95 group-active/ev:opacity-60"
-          style={{ backgroundColor: color }}>
-          {first.icon && first.icon !== "none" && (
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 flex items-center justify-center">
-              <EventIconBadge icon={first.icon} size={9}/>
-            </span>
+        {/* ── Time track ── */}
+        <div className="relative w-full h-[12px] rounded-sm overflow-hidden transition-all
+          group-hover/ev:brightness-125"
+          style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
+
+          {/* Noon tick */}
+          <div className="absolute top-0 bottom-0 w-px opacity-20"
+            style={{ left: `${workPct("12:00")}%`, backgroundColor: "white" }}/>
+
+          {hasTime ? (
+            /* Positioned event bar */
+            <div className="absolute top-0.5 bottom-0.5 rounded-[3px] flex items-center overflow-hidden"
+              style={{ left: `${barLeft}%`, width: `${barW}%`, backgroundColor: color, opacity: 0.92 }}>
+              {barW > 18 && (
+                <span className="text-white/90 text-[5.5px] font-bold px-0.5 leading-none truncate select-none">
+                  {dur}
+                </span>
+              )}
+              {first.icon && first.icon !== "none" && barW > 28 && (
+                <EventIconBadge icon={first.icon} size={7}/>
+              )}
+            </div>
+          ) : (
+            /* No time — full-width muted bar */
+            <div className="absolute inset-y-0.5 left-0.5 right-0.5 rounded-[3px]"
+              style={{ backgroundColor: color, opacity: 0.35 }}/>
           )}
+
           {events.length > 1 && (
-            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-background border border-border
-              text-[6px] font-bold flex items-center justify-center text-foreground z-10">
+            <span className="absolute top-0 right-0 w-3 h-3 rounded-bl-sm rounded-tr-sm
+              bg-background/80 text-[5px] font-bold flex items-center justify-center text-foreground">
               {events.length}
             </span>
           )}
         </div>
 
-        {/* ── Time bar: shows WHEN and HOW LONG within 6–22h window ── */}
-        <div className="relative w-full h-[9px] rounded-sm overflow-hidden"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
-          {hasTime ? (
-            <>
-              {/* Hour ticks at 6, 12, 18 */}
-              {[workPct("06:00"), workPct("12:00"), workPct("18:00")].map((p, i) => (
-                <div key={i} className="absolute top-0 bottom-0 w-px"
-                  style={{ left: `${p}%`, backgroundColor: i === 1 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.10)" }}/>
-              ))}
-              {/* Event block — position = start time, width = duration */}
-              <div className="absolute top-0 bottom-0 rounded-sm"
-                style={{ left: `${stripStart}%`, width: `${stripW}%`, backgroundColor: color }}/>
-            </>
-          ) : (
-            /* No time: subtle full-width tint */
-            <div className="absolute inset-0" style={{ backgroundColor: color, opacity: 0.25 }}/>
-          )}
-        </div>
-
-        {/* ── Duration label ── */}
-        <span className="text-[7px] leading-none font-mono tracking-tight"
-          style={{ color: hasTime ? `${color}cc` : "transparent" }}>
-          {hasTime ? dur : "—"}
-        </span>
+        {/* ── Earnings badge ── */}
+        {earn > 0 ? (
+          <div className="flex items-center justify-center">
+            <span className="text-[7px] font-bold leading-none text-emerald-400 tabular-nums">
+              ₽{earn >= 1000 ? `${Math.round(earn / 100) / 10}к` : earn}
+            </span>
+          </div>
+        ) : hasTime ? (
+          <div className="flex items-center justify-center">
+            <span className="text-[6.5px] leading-none text-muted-foreground/30 font-mono">
+              {dur}
+            </span>
+          </div>
+        ) : (
+          <div className="h-[7px]"/>
+        )}
       </div>
 
-      {/* Rich hover tooltip */}
-      {hovering && (
+      {/* Singleton tooltip — only render if we own the gate */}
+      {hovering && tooltipOwnerId === tipId && (
         <TimeTooltip event={first} dur={dur} anchorEl={ref.current} onEnter={showTip} onLeave={hideTip}/>
       )}
     </>
