@@ -336,85 +336,38 @@ export default function Home() {
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
 
       {/* ── Header ── */}
-      <header className="flex items-center justify-between px-5 py-3 border-b border-border flex-shrink-0 gap-4">
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-3.5 h-3.5 text-primary">
+      <header className="flex items-center justify-between px-5 py-2.5 border-b border-border/50 flex-shrink-0 gap-4">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-3 h-3 text-primary/80">
               <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
           </div>
-          <span className="text-sm font-semibold tracking-tight">Планировщик</span>
+          <span className="text-xs font-semibold tracking-tight text-foreground/80">Планировщик</span>
         </div>
 
         <div className="flex items-center gap-1">
           <button data-testid="btn-prev-month"
             onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-            className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
-            <ChevronLeft className="w-3.5 h-3.5"/>
+            className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+            <ChevronLeft className="w-3 h-3"/>
           </button>
           <button data-testid="btn-today"
             onClick={() => setCurrentMonth(new Date())}
-            className="px-3 h-7 rounded text-xs font-medium hover:bg-accent transition-colors min-w-[130px] text-center">
+            className="px-3 h-6 rounded text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors min-w-[120px] text-center">
             {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
           </button>
           <button data-testid="btn-next-month"
             onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-            className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
-            <ChevronRight className="w-3.5 h-3.5"/>
+            className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors">
+            <ChevronRight className="w-3 h-3"/>
           </button>
         </div>
 
-        {/* Earnings badge */}
-        {events.length > 0 && (
-          <div className="flex items-center gap-3 px-3 h-7 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex-shrink-0">
-            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-              <TrendingUp className="w-3 h-3"/>
-              {fmtMoney(totalEarnings)}
-            </span>
-            {totalExpenses > 0 && (
-              <>
-                <div className="w-px h-3.5 bg-emerald-500/30"/>
-                <span className="flex items-center gap-1 text-[10px] text-rose-400/80">
-                  <ArrowDownRight className="w-3 h-3"/>
-                  {fmtMoney(totalExpenses)}
-                </span>
-              </>
-            )}
-            {dayEarnings > 0 && (
-              <>
-                <div className="w-px h-3.5 bg-emerald-500/30"/>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
-                  <CalendarDays className="w-3 h-3"/>
-                  {fmtMoney(dayEarnings)}
-                </span>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Clipboard badge */}
-        {copiedEvent && (
-          <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 flex-shrink-0 max-w-[160px]">
-            <Copy className="w-3 h-3 flex-shrink-0 animate-pulse"/>
-            <span className="text-[10px] font-semibold truncate">{copiedEvent.title}</span>
-            <button onClick={() => setCopiedEvent(null)} className="flex-shrink-0 ml-0.5 hover:text-white transition-colors">
-              <X className="w-2.5 h-2.5"/>
-            </button>
-          </div>
-        )}
-
-        {/* Finance panel toggle */}
-        <button
-          onClick={() => setShowFinance(v => !v)}
-          className={`flex items-center gap-1.5 text-xs font-medium px-3 h-7 rounded-md transition-colors flex-shrink-0
-            ${showFinance ? "bg-violet-500/20 text-violet-400 border border-violet-500/30" : "bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80"}`}>
-          <Wallet className="w-3.5 h-3.5"/> Финансы
-        </button>
-
         <button data-testid="btn-add-row-header"
           onClick={() => setShowAddRow(true)}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 h-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0">
-          <Plus className="w-3.5 h-3.5"/> Добавить строку
+          className="flex items-center gap-1.5 text-[11px] font-medium px-3 h-6 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0">
+          <Plus className="w-3 h-3"/> Добавить строку
         </button>
       </header>
 
@@ -425,76 +378,38 @@ export default function Home() {
         <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
           <table className="border-collapse" style={{ tableLayout: "fixed" }}>
             <colgroup>
-              <col style={{ width: 210, minWidth: 210 }}/>
-              {days.map(d => <col key={d.toISOString()} style={{ width: 58, minWidth: 58 }}/>)}
-              <col style={{ width: 44, minWidth: 44 }}/>
+              <col style={{ width: 180, minWidth: 180 }}/>
+              {days.map(d => <col key={d.toISOString()} style={{ width: 34, minWidth: 34 }}/>)}
             </colgroup>
 
             <thead className="sticky top-0 z-20">
-              {/* ── Week labels row ── */}
-              <tr>
-                <th className="bg-card border-b border-border/30 border-r border-border px-3"/>
-                {weekGroups.map(wDays => {
-                  const isFirst = wDays === weekGroups[0];
-                  const wEarn   = weekEarnings(wDays);
-                  const wExp    = weekExpenses(wDays);
-                  const label   = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
-                  return (
-                    <th key={wDays[0].toISOString()} colSpan={wDays.length}
-                      className={`bg-card border-b border-border/30 py-1.5 px-1 text-center
-                        ${!isFirst ? "border-l-2 border-l-border/50" : ""}`}>
-                      <div className="flex items-center justify-center gap-2 flex-wrap">
-                        <span className="text-[10px] text-muted-foreground/60 font-semibold">{label}</span>
-                        {wEarn > 0 && (
-                          <span className="text-[10px] font-bold text-emerald-400">
-                            +{fmtMoney(wEarn)}
-                          </span>
-                        )}
-                        {wExp > 0 && (
-                          <span className="text-[9px] font-semibold text-rose-400/70">
-                            -{fmtMoney(wExp)}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                  );
-                })}
-                <th className="bg-card border-b border-border/30 border-l border-border"/>
-              </tr>
-
               {/* ── Day numbers row ── */}
               <tr>
-                <th className="bg-card border-b border-r border-border px-3 py-1.5 text-left align-bottom">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Объект</span>
+                <th className="bg-card border-b border-border/40 border-r border-border/40 px-3 py-2 text-left align-middle">
+                  <span className="text-[11px] font-semibold text-muted-foreground/70 tracking-wide">Ресторан</span>
                 </th>
                 {days.map(day => {
                   const tod   = isToday(day), wknd = isWeekend(day);
                   const isMon = day.getDay() === 1;
-                  const ds    = format(day, "yyyy-MM-dd");
-                  const active = dayPanel === ds;
                   return (
                     <th key={day.toISOString()}
                       ref={tod ? todayThRef : undefined}
-                      onClick={() => setDayPanel(active ? format(new Date(), "yyyy-MM-dd") : ds)}
-                      className={`border-b border-border py-1 text-center align-bottom cursor-pointer transition-colors
-                        hover:bg-primary/10
-                        ${isMon ? "border-l-2 border-l-border/60" : ""}
-                        ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-b-primary" : ""}`}>
+                      className={`border-b border-border/40 py-1.5 text-center align-middle
+                        ${isMon ? "border-l border-l-border/30" : ""}
+                        ${wknd ? "bg-background" : "bg-card"}
+                        ${tod ? "bg-primary/10" : ""}`}>
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full
-                          ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/70" : "text-foreground"}`}>
+                        <span className={`text-[11px] font-bold w-[18px] h-[18px] flex items-center justify-center rounded-full leading-none
+                          ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/50" : "text-foreground/70"}`}>
                           {format(day, "d")}
                         </span>
-                        <span className={`text-[8px] font-medium ${wknd ? "text-muted-foreground/50" : "text-muted-foreground/70"}`}>
+                        <span className={`text-[8px] font-medium leading-none ${wknd ? "text-muted-foreground/35" : "text-muted-foreground/50"}`}>
                           {DAY_ABBR[day.getDay()]}
                         </span>
                       </div>
                     </th>
                   );
                 })}
-                <th className="bg-card border-b border-l border-border py-1 text-center">
-                  <span className="text-[9px] text-muted-foreground/50 uppercase">∑</span>
-                </th>
               </tr>
             </thead>
 
@@ -597,96 +512,30 @@ export default function Home() {
           </table>
         </div>
 
-        {/* ── Finance panel (right side) ── */}
-        {showFinance && (
-          <FinancePanel
-            events={events}
-            goals={goals}
-            totalEarnings={totalEarnings}
-            totalExpenses={totalExpenses}
-            thisWeekEarnings={thisWeekEarnings}
-            thisWeekExpenses={thisWeekExpenses}
-            onClose={() => setShowFinance(false)}
-            onAddGoal={addGoal}
-            onUpdateGoal={updateGoal}
-            onDeleteGoal={deleteGoal}
-          />
-        )}
       </div>
 
-      {/* ── Day schedule panel ── */}
-      {entities.length > 0 && (
-        <HorizontalTimeline
-          date={dayPanel}
-          entities={entities}
-          getEventsForCell={getEventsForCell}
-          onDayReset={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
-          collapsed={tlCollapsed}
-          onToggleCollapse={() => setTlCollapsed(v => !v)}
-        />
-      )}
-
       {/* ── Status bar ── */}
-      <footer className="border-t border-border flex-shrink-0">
-        {totalEarnings > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border/40 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {(() => {
-              const maxW = Math.max(...weekGroups.map(w => weekEarnings(w)), 1);
-              return weekGroups.map((wDays, i) => {
-                const earn    = weekEarnings(wDays);
-                const exp     = weekExpenses(wDays);
-                const net     = earn - exp;
-                const pctFill = (earn / maxW) * 100;
-                const label   = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
-                return (
-                  <div key={i} className="flex-shrink-0 relative rounded-lg border border-border/40 bg-background/50 overflow-hidden"
-                    style={{ minWidth: 96 }}>
-                    <div className="absolute bottom-0 left-0 h-0.5 rounded-full transition-all"
-                      style={{ width: `${pctFill}%`, backgroundColor: earn > 0 ? "rgb(52,211,153)" : "transparent" }}/>
-                    <div className="px-3 py-1.5">
-                      <p className="text-[10px] text-muted-foreground/60 leading-none mb-1">{label}</p>
-                      <p className={`text-[13px] font-bold leading-none tabular-nums ${earn > 0 ? "text-emerald-400" : "text-muted-foreground/25"}`}>
-                        {earn > 0 ? fmtMoney(earn) : "—"}
-                      </p>
-                      {exp > 0 && (
-                        <p className="text-[9px] text-rose-400/70 leading-none mt-0.5 tabular-nums">
-                          -{fmtMoney(exp)} · чист. {fmtMoney(net)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-
-            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 ml-auto">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"/>
-              <div>
-                <p className="text-[9px] text-emerald-400/60 leading-none mb-0.5">За месяц</p>
-                <p className="text-[14px] font-bold text-emerald-400 leading-none tabular-nums">{fmtMoney(totalEarnings)}</p>
-                {totalExpenses > 0 && (
-                  <p className="text-[9px] text-rose-400/70 leading-none mt-0.5 tabular-nums">
-                    -{fmtMoney(totalExpenses)} = {fmtMoney(totalEarnings - totalExpenses)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-5 px-5 py-2 text-xs text-muted-foreground">
+      <footer className="border-t border-border/40 flex-shrink-0">
+        <div className="flex items-center gap-5 px-5 py-2">
           {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
             <div key={s} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS[s] }}/>
-              <span>{STATUS_LABELS[s]}</span>
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[s] }}/>
+              <span className="text-[11px] text-muted-foreground/70">{STATUS_LABELS[s]}</span>
             </div>
           ))}
           <div className="ml-auto flex items-center gap-4">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.overdue }}/>{overdueN}</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.confirmed }}/>{confirmedN}</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.pending }}/>{pendingN}</span>
-            <span className="border-l border-border pl-4">Всего: <strong className="text-foreground">{events.length}</strong></span>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.overdue }}/>{overdueN}
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.confirmed }}/>{confirmedN}
+            </span>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: STATUS_COLORS.pending }}/>{pendingN}
+            </span>
+            <span className="border-l border-border/40 pl-4 text-[11px] text-muted-foreground/50">Всего: <strong className="text-foreground/70">{events.length}</strong></span>
           </div>
-          <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести · ✓ = выполнить</span>
+          <span className="text-[10px] text-muted-foreground/30 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
         </div>
       </footer>
 
@@ -837,11 +686,11 @@ function EntityRow({
   };
 
   return (
-    <tr className="group border-b border-border/30 hover:bg-white/[0.02] transition-colors">
+    <tr className="group border-b border-border/20 hover:bg-white/[0.015] transition-colors">
       {/* Name */}
-      <td className="border-r border-border/30 px-2.5 py-1 sticky left-0 bg-background z-10 group-hover:bg-[#1e2535] transition-colors">
+      <td className="border-r border-border/20 px-3 py-1.5 sticky left-0 bg-background z-10 group-hover:bg-[#0f1121] transition-colors">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ backgroundColor: entity.color }}/>
           {editing ? (
             <input ref={inputRef} value={editName}
               onChange={e => setEditName(e.target.value)}
@@ -850,20 +699,20 @@ function EntityRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
               }}
-              className="text-[13px] bg-transparent border-b border-primary outline-none flex-1 min-w-0 text-foreground"/>
+              className="text-[12px] bg-transparent border-b border-primary outline-none flex-1 min-w-0 text-foreground"/>
           ) : (
-            <span className="text-[13px] truncate cursor-default" onDoubleClick={() => setEditing(true)} title={entity.name}>
+            <span className="text-[12px] truncate cursor-default text-foreground/80" onDoubleClick={() => setEditing(true)} title={entity.name}>
               {entity.name}
             </span>
           )}
           {!editing && (
             <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
               <button onClick={() => setEditing(true)} title="Переименовать"
-                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent">
+                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-accent">
                 <Pencil className="w-2.5 h-2.5"/>
               </button>
               <button onClick={() => onDeleteEntity(entity.id)} title="Удалить"
-                className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent">
+                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-accent">
                 <Trash2 className="w-2.5 h-2.5"/>
               </button>
             </div>
@@ -881,11 +730,11 @@ function EntityRow({
         const isMon = day.getDay() === 1;
         return (
           <td key={dateStr}
-            className={`px-0.5 py-0.5 transition-all align-top h-[56px]
-              ${isMon ? "border-l-2 border-l-border/40" : ""}
-              ${wknd ? "bg-white/[0.012]" : ""}
-              ${tod  ? "bg-primary/[0.07]" : ""}
-              ${isDragTarget ? "bg-primary/20 ring-1 ring-inset ring-primary/40 rounded" : ""}`}
+            className={`px-0.5 py-0.5 transition-all align-middle h-[38px]
+              ${isMon ? "border-l border-l-border/20" : ""}
+              ${wknd ? "bg-white/[0.008]" : ""}
+              ${tod  ? "bg-primary/[0.05]" : ""}
+              ${isDragTarget ? "bg-primary/15 ring-1 ring-inset ring-primary/30 rounded" : ""}`}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}
             onDrop={e => { e.preventDefault(); onDrop(entity.id, dateStr); }}>
@@ -906,15 +755,6 @@ function EntityRow({
           </td>
         );
       })}
-
-      {/* Summary */}
-      <td className="border-l border-border/30 text-center py-1">
-        {eventCount > 0
-          ? <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-              style={{ backgroundColor:`${entity.color}25`, color:entity.color }}>{eventCount}</span>
-          : <span className="text-[10px] text-muted-foreground/30">—</span>
-        }
-      </td>
     </tr>
   );
 }
@@ -1155,17 +995,11 @@ function GridCell({
   const [hoverCard, setHoverCard] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* always keep module-level target in sync with this cell's hover state */
   const onCellEnter = () => { hoveredPasteTarget = { entityId, date }; };
   const onCellLeave = () => { if (hoveredPasteTarget?.entityId === entityId && hoveredPasteTarget?.date === date) hoveredPasteTarget = null; };
 
-  const showCard = () => {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setHoverCard(true);
-  };
-  const hideCard = () => {
-    hoverTimer.current = setTimeout(() => setHoverCard(false), 80);
-  };
+  const showCard = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHoverCard(true); };
+  const hideCard = () => { hoverTimer.current = setTimeout(() => setHoverCard(false), 80); };
 
   /* ── Empty cell ── */
   if (events.length === 0) {
@@ -1174,88 +1008,41 @@ function GridCell({
         onMouseEnter={onCellEnter}
         onMouseLeave={onCellLeave}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className={`group/c w-full h-full min-h-[48px] flex items-center justify-center cursor-pointer rounded-md transition-all border
-          ${copiedEventId ? "border-sky-500/30 hover:bg-sky-500/10 hover:border-sky-500/50" : "border-transparent hover:border-white/[0.08] hover:bg-white/[0.04]"}`}>
-        {copiedEventId
-          ? <Copy className="w-3 h-3 text-sky-500/40 group-hover/c:text-sky-400/70 transition-colors"/>
-          : <Plus className="w-3 h-3 text-transparent group-hover/c:text-muted-foreground/30 transition-colors"/>
-        }
+        className={`group/c w-full h-full min-h-[30px] flex items-center justify-center cursor-pointer rounded transition-colors
+          ${copiedEventId ? "hover:bg-sky-500/10" : "hover:bg-white/[0.04]"}`}>
+        <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/25 transition-colors"/>
       </div>
     );
   }
 
-  /* ── Multi-event cell ── */
+  /* ── Multi-event cell: stacked colored blocks ── */
   if (events.length > 1) {
-    const timedEvs = events.filter(e => e.startTime && e.endTime);
-    const totalBusy = timedEvs.reduce((s, e) => s + calcDurationMins(e.startTime!, e.endTime!), 0);
-    const freeWorkMins = Math.max(0, 960 - totalBusy);
-    const freeLabel = freeWorkMins > 0
-      ? (freeWorkMins >= 60
-          ? `${Math.floor(freeWorkMins / 60)}ч${freeWorkMins % 60 > 0 ? ` ${freeWorkMins % 60}м` : ""}`
-          : `${freeWorkMins}м`) + " своб."
-      : "Занято";
-
     return (
       <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
         onMouseEnter={onCellEnter}
         onMouseLeave={onCellLeave}
-        className="relative w-full min-h-[48px] rounded-md overflow-hidden border border-white/10
-          bg-white/[0.05] p-1 flex flex-col gap-0.5">
-        <div className="w-full h-[5px] rounded-full bg-black/30 relative overflow-hidden flex-shrink-0">
-          {timedEvs.map(ev => {
-            const left = workPct(ev.startTime!);
-            const w    = Math.max(3, workPct(ev.endTime!) - left);
-            return (
-              <div key={ev.id} className="absolute top-0 bottom-0 rounded-sm"
-                style={{ left: `${left}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.4 : 1 }}/>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-col gap-px flex-1 min-h-0">
-          {events.slice(0, 3).map(ev => (
-            <button key={ev.id}
-              onClick={e => { e.stopPropagation(); ref.current && onEventClick(ev, ref.current.getBoundingClientRect()); }}
-              onContextMenu={e => { e.stopPropagation(); onContextMenu(e.nativeEvent, ev); }}
-              className="flex items-center gap-1 w-full text-left hover:bg-white/10 rounded px-0.5 py-px transition-colors group/chip">
-              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: STATUS_COLORS[ev.status] }}/>
-              <span className={`text-[7px] text-white/75 truncate leading-none font-medium ${ev.done ? "line-through opacity-50" : ""}`}>
-                {ev.startTime ? `${fmtTime(ev.startTime)}` : ev.title.slice(0, 8)}
-              </span>
-              {ev.done && <BadgeCheck className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0 ml-auto"/>}
-            </button>
-          ))}
-          {events.length > 3 && (
-            <span className="text-[6.5px] text-white/40 px-0.5">+{events.length - 3} ещё</span>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between mt-auto flex-shrink-0">
-          <span className={`text-[6.5px] leading-none font-medium ${freeWorkMins > 0 ? "text-white/35" : "text-rose-400/70"}`}>
-            {freeLabel}
-          </span>
-          <button
-            onClick={e => { e.stopPropagation(); ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect()); }}
-            className="w-4 h-4 rounded flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/15 transition-colors flex-shrink-0">
-            <Plus className="w-2.5 h-2.5"/>
-          </button>
-        </div>
+        className="w-full h-full min-h-[30px] flex items-center justify-center gap-[2px] cursor-pointer"
+        onClick={e => { e.stopPropagation(); ref.current && onEventClick(events[0], ref.current.getBoundingClientRect()); }}>
+        {events.slice(0, 3).map(ev => (
+          <button key={ev.id}
+            onClick={e => { e.stopPropagation(); ref.current && onEventClick(ev, ref.current.getBoundingClientRect()); }}
+            onContextMenu={e => { e.stopPropagation(); onContextMenu(e.nativeEvent, ev); }}
+            className="w-[7px] h-[22px] rounded-[2px] flex-shrink-0 hover:brightness-125 transition-all"
+            style={{ backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.45 : 0.9 }}
+          />
+        ))}
+        {events.length > 3 && (
+          <span className="text-[7px] text-muted-foreground/40 leading-none">+{events.length - 3}</span>
+        )}
       </div>
     );
   }
 
-  /* ── Single event card ── */
-  const first    = events[0];
-  const hasTime  = !!(first.startTime && first.endTime);
-  const dur      = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
-  const color    = STATUS_COLORS[first.status];
-  const gradient = STATUS_GRADIENTS[first.status];
-  const earn     = first.earnings ?? 0;
-  const exp      = first.expenses ?? 0;
-
-  const span      = hasTime ? durSpan(first.startTime!, first.endTime!) : 0.4;
-  const startFrac = hasTime ? Math.max(0, Math.min(1, (calcDurationMins("06:00", first.startTime!) / 960))) : 0;
+  /* ── Single event: clean colored block ── */
+  const first = events[0];
+  const color = STATUS_COLORS[first.status];
+  const hasTime = !!(first.startTime && first.endTime);
+  const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
 
   return (
     <>
@@ -1272,76 +1059,17 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className={`relative w-full min-h-[48px] cursor-grab active:cursor-grabbing group/ev rounded-md overflow-hidden
-          transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg select-none
-          ${copiedEventId === first.id ? "ring-2 ring-sky-400/70 ring-offset-1 ring-offset-background" : ""}`}
-        style={{ background: gradient, opacity: first.done ? 0.65 : 1 }}>
-
-        {/* Done overlay */}
+        className={`relative w-full h-full min-h-[30px] flex items-center justify-center cursor-grab active:cursor-grabbing group/ev rounded transition-all hover:brightness-110 select-none
+          ${copiedEventId === first.id ? "ring-1 ring-sky-400/60 ring-offset-1 ring-offset-background" : ""}`}>
+        <div
+          className="w-[22px] h-[22px] rounded-[3px] flex-shrink-0 transition-all group-hover/ev:scale-105 group-hover/ev:shadow-md"
+          style={{ backgroundColor: color, opacity: first.done ? 0.4 : 0.88 }}
+        />
         {first.done && (
-          <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10 pointer-events-none rounded-md">
-            <div className="flex items-center gap-1 bg-emerald-500/80 rounded-full px-1.5 py-0.5">
-              <Check className="w-2.5 h-2.5 text-white"/>
-              <span className="text-[8px] text-white font-bold">Готово</span>
-            </div>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <Check className="w-2.5 h-2.5 text-white drop-shadow" style={{ opacity: 0.9 }}/>
           </div>
         )}
-
-        {/* Icon */}
-        {first.icon && first.icon !== "none" && !first.done && (
-          <span className="absolute top-1.5 left-1.5 opacity-80">
-            <EventIconBadge icon={first.icon} size={10}/>
-          </span>
-        )}
-
-        {/* Copy button — appears on hover */}
-        <button
-          onClick={e => { e.stopPropagation(); onCopyEvent(first); }}
-          title="Копировать (Ctrl+C)"
-          className="absolute top-1 right-5 w-4 h-4 rounded-full opacity-0 group-hover/ev:opacity-100
-            transition-all flex items-center justify-center z-20
-            bg-black/30 hover:bg-sky-500/80"
-          style={{ pointerEvents: "all" }}>
-          <Copy className="w-2.5 h-2.5 text-white"/>
-        </button>
-
-        {/* Done toggle button — appears on hover */}
-        <button
-          onClick={e => { e.stopPropagation(); onDoneToggle(first); }}
-          title={first.done ? "Снять отметку" : "Отметить выполненным"}
-          className="absolute top-1 right-1 w-4 h-4 rounded-full opacity-0 group-hover/ev:opacity-100
-            transition-all flex items-center justify-center z-20
-            bg-black/30 hover:bg-emerald-500/80"
-          style={{ pointerEvents: "all" }}>
-          <Check className="w-2.5 h-2.5 text-white"/>
-        </button>
-
-        {/* Content */}
-        <div className={`px-1.5 pt-1.5 pb-1 flex flex-col justify-between h-full min-h-[48px] ${first.done ? "opacity-60" : ""}`}>
-          <p className={`text-white text-[9px] font-semibold leading-tight line-clamp-2 drop-shadow-sm ${first.done ? "line-through" : ""}`}>
-            {first.title}
-          </p>
-          <div className="mt-auto">
-            {hasTime && (
-              <p className="text-white/75 text-[8px] font-mono leading-none mb-1">
-                {fmtTime(first.startTime!)}–{fmtTime(first.endTime!)}
-              </p>
-            )}
-            <div className="w-full h-[3px] rounded-full bg-black/20 overflow-hidden">
-              <div className="h-full rounded-full bg-white/50 transition-all"
-                style={{ width: `${span * 100}%`, marginLeft: `${startFrac * (1 - span) * 100}%` }}/>
-            </div>
-            {earn > 0 ? (
-              <p className="text-white/80 text-[8px] font-bold leading-none mt-1 tabular-nums">
-                {earn >= 1000 ? `${Math.round(earn / 100) / 10}к ₽` : `${earn} ₽`}
-                {exp > 0 && <span className="text-rose-300/80 ml-1">-{exp >= 1000 ? `${Math.round(exp / 100) / 10}к` : exp}</span>}
-              </p>
-            ) : dur ? (
-              <p className="text-white/60 text-[8px] leading-none mt-1">{dur}</p>
-            ) : null}
-          </div>
-        </div>
-        <div className="absolute inset-0 opacity-0 group-hover/ev:opacity-100 bg-black/10 transition-opacity pointer-events-none rounded-md"/>
       </div>
 
       {/* ── Hover Info Card ── */}
