@@ -231,7 +231,15 @@ export default function Home() {
   useEffect(() => { addEventRef.current = addEvent; }, [addEvent]);
 
   const openAdd  = useCallback((entityId: string, date: string, anchor: DOMRect) => {
-    setCtxMenu(null); setPopup({ mode: "add", entityId, date, anchor });
+    setCtxMenu(null);
+    /* paste-on-click: if clipboard has an event, paste it instead of opening the add dialog */
+    if (copiedEventRef.current) {
+      addEventRef.current({ ...copiedEventRef.current, id: genId(), entityId, date, done: false });
+      setCopiedEvent(null);
+      copiedEventRef.current = null;
+      return;
+    }
+    setPopup({ mode: "add", entityId, date, anchor });
   }, []);
 
   const openView = useCallback((event: PlannerEvent, anchor: DOMRect) => {
@@ -534,6 +542,7 @@ export default function Home() {
                   onDeleteEntity={deleteEntity}
                   onRenameEntity={renameEntity}
                   copiedEventId={copiedEvent?.id ?? null}
+                  onCopyEvent={ev => { setCopiedEvent(ev); copiedEventRef.current = ev; }}
                 />
               ))}
 
@@ -804,13 +813,14 @@ interface EntityRowProps {
   onDeleteEntity: (id: string) => void;
   onRenameEntity: (id: string, name: string) => void;
   copiedEventId: string | null;
+  onCopyEvent: (ev: PlannerEvent) => void;
 }
 
 function EntityRow({
   entity, days, eventCount, dragOverKey,
   getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick, onDoneToggle,
   onDragStart, onDragEnd, onDragOver, onDrop,
-  onDeleteEntity, onRenameEntity, copiedEventId,
+  onDeleteEntity, onRenameEntity, copiedEventId, onCopyEvent,
 }: EntityRowProps) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(entity.name);
@@ -891,6 +901,7 @@ function EntityRow({
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
               copiedEventId={copiedEventId}
+              onCopyEvent={onCopyEvent}
             />
           </td>
         );
@@ -1127,6 +1138,7 @@ interface GridCellProps {
   onDragStart: (evId: string, srcEId: string, srcDate: string) => void;
   onDragEnd: () => void;
   copiedEventId: string | null;
+  onCopyEvent: (ev: PlannerEvent) => void;
 }
 
 function durSpan(start: string, end: string): number {
@@ -1137,7 +1149,7 @@ function durSpan(start: string, end: string): number {
 function GridCell({
   events, entityId, date,
   onAddClick, onEventClick, onContextMenu, onShiftClick, onDoneToggle,
-  onDragStart, onDragEnd, copiedEventId,
+  onDragStart, onDragEnd, copiedEventId, onCopyEvent,
 }: GridCellProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [hoverCard, setHoverCard] = useState(false);
@@ -1281,6 +1293,17 @@ function GridCell({
             <EventIconBadge icon={first.icon} size={10}/>
           </span>
         )}
+
+        {/* Copy button — appears on hover */}
+        <button
+          onClick={e => { e.stopPropagation(); onCopyEvent(first); }}
+          title="Копировать (Ctrl+C)"
+          className="absolute top-1 right-5 w-4 h-4 rounded-full opacity-0 group-hover/ev:opacity-100
+            transition-all flex items-center justify-center z-20
+            bg-black/30 hover:bg-sky-500/80"
+          style={{ pointerEvents: "all" }}>
+          <Copy className="w-2.5 h-2.5 text-white"/>
+        </button>
 
         {/* Done toggle button — appears on hover */}
         <button
