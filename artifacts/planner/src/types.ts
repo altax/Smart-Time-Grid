@@ -33,9 +33,15 @@ export interface PlannerEvent {
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {
-  overdue:   "#ef4444",
-  confirmed: "#22c55e",
-  pending:   "#f97316",
+  overdue:   "#f43f5e",
+  confirmed: "#10b981",
+  pending:   "#f59e0b",
+};
+
+export const STATUS_GRADIENTS: Record<EventStatus, string> = {
+  overdue:   "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+  confirmed: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+  pending:   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
 };
 
 export const STATUS_LABELS: Record<EventStatus, string> = {
@@ -69,7 +75,25 @@ export function calcDuration(startTime: string, endTime: string): string {
   }
 }
 
+/** Returns duration in minutes */
+export function calcDurationMins(startTime: string, endTime: string): number {
+  try {
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+  } catch { return 0; }
+}
+
 /** "09:00" → "9:00" for compact display */
 export function fmtTime(t: string): string {
   return t?.startsWith("0") ? t.slice(1) : t;
+}
+
+/** Add minutes to a "HH:MM" string */
+export function addMinutes(time: string, mins: number): string {
+  try {
+    const [h, m] = time.split(":").map(Number);
+    const total = Math.max(0, Math.min(1439, h * 60 + m + mins));
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  } catch { return time; }
 }

@@ -6,16 +6,16 @@ import {
 import { ru } from "date-fns/locale";
 import {
   ChevronLeft, ChevronRight, Plus, X, Check,
-  Pencil, Trash2, RotateCcw, Sparkles, Clock, GripVertical,
+  Pencil, Trash2, RotateCcw, Sparkles, Clock,
   Dumbbell, Briefcase, Star, Car, UtensilsCrossed,
   Copy, TrendingUp, CalendarDays,
 } from "lucide-react";
 import { usePlanner } from "../hooks/use-planner";
 import {
   Entity, PlannerEvent, EventStatus, EventIcon,
-  STATUS_COLORS, STATUS_LABELS, STATUS_CYCLE,
+  STATUS_COLORS, STATUS_GRADIENTS, STATUS_LABELS, STATUS_CYCLE,
   EVENT_ICON_LABELS,
-  calcDuration, fmtTime,
+  calcDuration, calcDurationMins, fmtTime, addMinutes,
 } from "../types";
 
 /* ── Ozon PVZ icon ── */
@@ -723,7 +723,7 @@ function EntityRow({
         const isMon = day.getDay() === 1;
         return (
           <td key={dateStr}
-            className={`px-0.5 py-[3px] transition-all
+            className={`px-0.5 py-0.5 transition-all align-top h-[56px]
               ${isMon ? "border-l-2 border-l-border/40" : ""}
               ${wknd ? "bg-white/[0.012]" : ""}
               ${tod  ? "bg-primary/[0.07]" : ""}
@@ -1142,6 +1142,12 @@ interface GridCellProps {
   onDragEnd: () => void;
 }
 
+/** Duration in minutes → span factor (0..1) within an 8-hour workday */
+function durSpan(start: string, end: string): number {
+  const mins = calcDurationMins(start, end);
+  return Math.min(1, Math.max(0.12, mins / 480)); // 480 = 8h workday
+}
+
 function GridCell({
   events, entityId, date,
   onAddClick, onEventClick, onContextMenu, onShiftClick,
@@ -1166,13 +1172,8 @@ function GridCell({
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className="group/c w-full flex flex-col gap-[3px] py-1 cursor-pointer rounded transition-all">
-        {/* Track placeholder */}
-        <div className="w-full h-[12px] rounded-sm transition-all
-          group-hover/c:bg-white/[0.06]"
-          style={{ backgroundColor: "rgba(255,255,255,0.025)" }}>
-          <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/25 mx-auto mt-[1px] transition-colors"/>
-        </div>
+        className="group/c w-full h-full min-h-[48px] flex items-center justify-center cursor-pointer rounded-md transition-all border border-transparent hover:border-white/[0.08] hover:bg-white/[0.04]">
+        <Plus className="w-3 h-3 text-transparent group-hover/c:text-muted-foreground/30 transition-colors"/>
       </div>
     );
   }
@@ -1181,14 +1182,13 @@ function GridCell({
   const hasTime = !!(first.startTime && first.endTime);
   const dur     = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
   const color   = STATUS_COLORS[first.status];
+  const gradient = STATUS_GRADIENTS[first.status];
+  const earn    = first.earnings ?? 0;
 
-  /* time bar metrics within 6–22h window */
-  const barLeft = hasTime ? workPct(first.startTime!) : 0;
-  const barEnd  = hasTime ? workPct(first.endTime!)   : 100;
-  const barW    = Math.max(6, barEnd - barLeft);
-
-  /* earnings display */
-  const earn = first.earnings ?? 0;
+  /* Duration-based fill: how much of the cell this event visually "fills" */
+  const span   = hasTime ? durSpan(first.startTime!, first.endTime!) : 0.4;
+  /* Start position (0–22h mapped to 0–100%) */
+  const startFrac = hasTime ? Math.max(0, Math.min(1, (calcDurationMins("06:00", first.startTime!) / 960))) : 0;
 
   return (
     <>
@@ -1205,64 +1205,57 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className="flex flex-col gap-[3px] w-full py-1 cursor-grab active:cursor-grabbing group/ev
-          rounded transition-all group-hover/ev:bg-white/[0.03]">
+        className="relative w-full min-h-[48px] cursor-grab active:cursor-grabbing group/ev rounded-md overflow-hidden
+          transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg select-none"
+        style={{ background: gradient }}>
 
-        {/* ── Time track ── */}
-        <div className="relative w-full h-[12px] rounded-sm overflow-hidden transition-all
-          group-hover/ev:brightness-125"
-          style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
+        {/* Multi-event badge */}
+        {events.length > 1 && (
+          <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/30 text-[8px] font-bold
+            flex items-center justify-center text-white z-10">
+            {events.length}
+          </span>
+        )}
 
-          {/* Noon tick */}
-          <div className="absolute top-0 bottom-0 w-px opacity-20"
-            style={{ left: `${workPct("12:00")}%`, backgroundColor: "white" }}/>
+        {/* Icon */}
+        {first.icon && first.icon !== "none" && (
+          <span className="absolute top-1.5 left-1.5 opacity-80">
+            <EventIconBadge icon={first.icon} size={10}/>
+          </span>
+        )}
 
-          {hasTime ? (
-            /* Positioned event bar */
-            <div className="absolute top-0.5 bottom-0.5 rounded-[3px] flex items-center overflow-hidden"
-              style={{ left: `${barLeft}%`, width: `${barW}%`, backgroundColor: color, opacity: 0.92 }}>
-              {barW > 18 && (
-                <span className="text-white/90 text-[5.5px] font-bold px-0.5 leading-none truncate select-none">
-                  {dur}
-                </span>
-              )}
-              {first.icon && first.icon !== "none" && barW > 28 && (
-                <EventIconBadge icon={first.icon} size={7}/>
-              )}
+        {/* Content */}
+        <div className="px-1.5 pt-1.5 pb-1 flex flex-col justify-between h-full min-h-[48px]">
+          <p className="text-white text-[9px] font-semibold leading-tight line-clamp-2 drop-shadow-sm">
+            {first.title}
+          </p>
+
+          <div className="mt-auto">
+            {hasTime && (
+              <p className="text-white/75 text-[8px] font-mono leading-none mb-1">
+                {fmtTime(first.startTime!)}–{fmtTime(first.endTime!)}
+              </p>
+            )}
+            {/* Duration bar */}
+            <div className="w-full h-[3px] rounded-full bg-black/20 overflow-hidden">
+              <div className="h-full rounded-full bg-white/50 transition-all"
+                style={{ width: `${span * 100}%`, marginLeft: `${startFrac * (1 - span) * 100}%` }}/>
             </div>
-          ) : (
-            /* No time — full-width muted bar */
-            <div className="absolute inset-y-0.5 left-0.5 right-0.5 rounded-[3px]"
-              style={{ backgroundColor: color, opacity: 0.35 }}/>
-          )}
-
-          {events.length > 1 && (
-            <span className="absolute top-0 right-0 w-3 h-3 rounded-bl-sm rounded-tr-sm
-              bg-background/80 text-[5px] font-bold flex items-center justify-center text-foreground">
-              {events.length}
-            </span>
-          )}
+            {/* Earnings or duration */}
+            {earn > 0 ? (
+              <p className="text-white/80 text-[8px] font-bold leading-none mt-1 tabular-nums">
+                {earn >= 1000 ? `${Math.round(earn / 100) / 10}к ₽` : `${earn} ₽`}
+              </p>
+            ) : dur ? (
+              <p className="text-white/60 text-[8px] leading-none mt-1">{dur}</p>
+            ) : null}
+          </div>
         </div>
 
-        {/* ── Earnings badge ── */}
-        {earn > 0 ? (
-          <div className="flex items-center justify-center">
-            <span className="text-[7px] font-bold leading-none text-emerald-400 tabular-nums">
-              ₽{earn >= 1000 ? `${Math.round(earn / 100) / 10}к` : earn}
-            </span>
-          </div>
-        ) : hasTime ? (
-          <div className="flex items-center justify-center">
-            <span className="text-[6.5px] leading-none text-muted-foreground/30 font-mono">
-              {dur}
-            </span>
-          </div>
-        ) : (
-          <div className="h-[7px]"/>
-        )}
+        {/* Shift-click hint overlay */}
+        <div className="absolute inset-0 opacity-0 group-hover/ev:opacity-100 bg-black/10 transition-opacity pointer-events-none rounded-md"/>
       </div>
 
-      {/* Singleton tooltip — only render if we own the gate */}
       {hovering && tooltipOwnerId === tipId && (
         <TimeTooltip event={first} dur={dur} anchorEl={ref.current} onEnter={showTip} onLeave={hideTip}/>
       )}
@@ -1360,6 +1353,134 @@ function TimeTooltip({ event, dur, anchorEl, onEnter, onLeave }: TimeTooltipProp
   );
 }
 
+/* ─────────────────────── TimePicker ─────────────────────── */
+const QUICK_DURATIONS = [
+  { label: "30 м", mins: 30 },
+  { label: "1 ч",  mins: 60 },
+  { label: "1.5 ч",mins: 90 },
+  { label: "2 ч",  mins: 120 },
+  { label: "3 ч",  mins: 180 },
+  { label: "4 ч",  mins: 240 },
+  { label: "8 ч",  mins: 480 },
+];
+
+function TimeSpinner({
+  value, onChange, label,
+}: { value: string; onChange: (v: string) => void; label: string }) {
+  const [h, m] = value ? value.split(":").map(Number) : [9, 0];
+
+  const setH = (nh: number) => {
+    const clamped = ((nh % 24) + 24) % 24;
+    onChange(`${String(clamped).padStart(2,"0")}:${String(m).padStart(2,"0")}`);
+  };
+  const setM = (nm: number) => {
+    const clamped = ((nm % 60) + 60) % 60;
+    onChange(`${String(h).padStart(2,"0")}:${String(clamped).padStart(2,"0")}`);
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-1 flex-1">
+      <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
+      <div className="flex items-center gap-1 bg-accent/50 rounded-lg px-2 py-1.5 border border-border">
+        {/* Hours */}
+        <div className="flex flex-col items-center gap-0.5">
+          <button type="button" onClick={() => setH(h + 1)}
+            className="w-5 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
+            <ChevronLeft className="w-3 h-3 rotate-90"/>
+          </button>
+          <span className="text-base font-bold text-foreground tabular-nums w-7 text-center leading-none">
+            {String(h).padStart(2,"0")}
+          </span>
+          <button type="button" onClick={() => setH(h - 1)}
+            className="w-5 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
+            <ChevronLeft className="w-3 h-3 -rotate-90"/>
+          </button>
+        </div>
+        <span className="text-base font-bold text-muted-foreground/60 mb-0.5">:</span>
+        {/* Minutes */}
+        <div className="flex flex-col items-center gap-0.5">
+          <button type="button" onClick={() => setM(m + 15)}
+            className="w-5 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
+            <ChevronLeft className="w-3 h-3 rotate-90"/>
+          </button>
+          <span className="text-base font-bold text-foreground tabular-nums w-7 text-center leading-none">
+            {String(m).padStart(2,"0")}
+          </span>
+          <button type="button" onClick={() => setM(m - 15)}
+            className="w-5 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
+            <ChevronLeft className="w-3 h-3 -rotate-90"/>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface TimePickerProps {
+  startTime: string;
+  endTime: string;
+  onStartChange: (v: string) => void;
+  onEndChange: (v: string) => void;
+}
+
+function TimePicker({ startTime, endTime, onStartChange, onEndChange }: TimePickerProps) {
+  const dur     = startTime && endTime ? calcDuration(startTime, endTime) : "";
+  const durMins = startTime && endTime ? calcDurationMins(startTime, endTime) : 0;
+  const span    = durMins > 0 ? Math.min(1, durMins / 480) : 0;
+
+  return (
+    <div className="space-y-2.5">
+      {/* Spinners row */}
+      <div className="flex items-start gap-2">
+        <TimeSpinner value={startTime} onChange={onStartChange} label="Начало"/>
+        <div className="flex flex-col items-center pt-7 flex-shrink-0">
+          <div className="w-4 h-px bg-border/60"/>
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 mt-0.5"/>
+        </div>
+        <TimeSpinner value={endTime} onChange={onEndChange} label="Конец"/>
+      </div>
+
+      {/* Quick duration presets */}
+      <div>
+        <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1.5">Быстрая длительность</p>
+        <div className="flex flex-wrap gap-1">
+          {QUICK_DURATIONS.map(({ label, mins }) => {
+            const isActive = durMins === mins;
+            return (
+              <button key={label} type="button"
+                onClick={() => onEndChange(addMinutes(startTime, mins))}
+                className={`text-[10px] font-medium px-2 py-0.5 rounded-md border transition-all
+                  ${isActive
+                    ? "bg-primary text-primary-foreground border-transparent scale-105"
+                    : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"}`}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Visual bar preview */}
+      {dur && (
+        <div className="rounded-lg bg-accent/40 border border-border p-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold text-foreground flex items-center gap-1">
+              <Clock className="w-3 h-3 text-primary"/> {startTime} → {endTime}
+            </span>
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+              {dur}
+            </span>
+          </div>
+          <div className="w-full h-2 bg-background/60 rounded-full overflow-hidden border border-border/40">
+            <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70 transition-all"
+              style={{ width: `${Math.max(5, span * 100)}%` }}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────── AddEventPopup ─────────────────────── */
 interface AddEventPopupProps {
   entityId: string;
@@ -1384,8 +1505,6 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
   const dateLabel = (() => {
     try { return format(parseISO(date), "d MMMM yyyy", { locale: ru }); } catch { return date; }
   })();
-
-  const dur = useTime && startTime && endTime ? calcDuration(startTime, endTime) : "";
 
   const submit = () => {
     if (!title.trim()) return;
@@ -1438,27 +1557,13 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
             </button>
 
             {useTime && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground block mb-0.5">Начало</label>
-                  <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
-                    className="w-full text-sm bg-accent/40 border border-border rounded-lg px-2 py-1.5 outline-none focus:border-primary text-foreground transition-colors"/>
-                </div>
-                <div className="flex flex-col items-center pt-4">
-                  <div className="w-4 h-px bg-border"/>
-                  <span className="text-[10px] text-muted-foreground mt-0.5">→</span>
-                </div>
-                <div className="flex-1">
-                  <label className="text-[10px] text-muted-foreground block mb-0.5">Конец</label>
-                  <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
-                    className="w-full text-sm bg-accent/40 border border-border rounded-lg px-2 py-1.5 outline-none focus:border-primary text-foreground transition-colors"/>
-                </div>
-              </div>
-            )}
-            {dur && (
-              <div className="mt-1.5 flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
-                <Clock className="w-3 h-3 text-primary flex-shrink-0"/>
-                <span className="text-xs font-semibold text-primary">Длительность: {dur}</span>
+              <div className="mt-2">
+                <TimePicker
+                  startTime={startTime}
+                  endTime={endTime}
+                  onStartChange={setStartTime}
+                  onEndChange={setEndTime}
+                />
               </div>
             )}
           </div>
@@ -1577,30 +1682,13 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave, onDuplica
             placeholder="Ответственный"
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
 
-          {/* Time row */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground block mb-0.5">Начало</label>
-              <input type="time" value={startTime} onChange={e => { setStartTime(e.target.value); mark(); }}
-                className="w-full text-xs bg-accent/40 border border-border rounded-lg px-2 py-1.5 outline-none focus:border-primary text-foreground transition-colors"/>
-            </div>
-            <div className="flex flex-col items-center pt-4">
-              <span className="text-[10px] text-muted-foreground">→</span>
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-muted-foreground block mb-0.5">Конец</label>
-              <input type="time" value={endTime} onChange={e => { setEndTime(e.target.value); mark(); }}
-                className="w-full text-xs bg-accent/40 border border-border rounded-lg px-2 py-1.5 outline-none focus:border-primary text-foreground transition-colors"/>
-            </div>
-          </div>
-
-          {/* Duration badge */}
-          {dur && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20">
-              <Clock className="w-3 h-3 text-primary flex-shrink-0"/>
-              <span className="text-xs font-semibold text-primary">Длительность: {dur}</span>
-            </div>
-          )}
+          {/* Time picker */}
+          <TimePicker
+            startTime={startTime}
+            endTime={endTime}
+            onStartChange={v => { setStartTime(v); mark(); }}
+            onEndChange={v => { setEndTime(v); mark(); }}
+          />
 
           <textarea value={editNotes} onChange={e => { setEditNotes(e.target.value); mark(); }}
             placeholder="Заметки..."
