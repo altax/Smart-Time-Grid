@@ -29,6 +29,7 @@ export interface PlannerEvent {
   startTime?: string; // "HH:MM"
   endTime?: string;   // "HH:MM"
   icon?: EventIcon;
+  earnings?: number;  // руб. за смену
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {

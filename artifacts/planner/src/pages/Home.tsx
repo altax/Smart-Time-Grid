@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, Plus, X, Check,
   Pencil, Trash2, RotateCcw, Sparkles, Clock, GripVertical,
   Dumbbell, Briefcase, Star, Car, UtensilsCrossed,
+  Copy, TrendingUp, CalendarDays,
 } from "lucide-react";
 import { usePlanner } from "../hooks/use-planner";
 import {
@@ -81,6 +82,11 @@ function IconPicker({ value, onChange }: { value: EventIcon; onChange: (v: Event
 
 function genId() { return Math.random().toString(36).substring(2, 12); }
 
+function fmtMoney(n: number): string {
+  if (n === 0) return "0 ₽";
+  return n.toLocaleString("ru-RU") + " ₽";
+}
+
 /** Convert "HH:MM" to 0–100% within a 6:00–22:00 window for the time strip */
 function workPct(t: string): number {
   try {
@@ -132,6 +138,8 @@ export default function Home() {
   const [newEntityName, setNewEntityName] = useState("");
   const [showAddRow,  setShowAddRow] = useState(false);
   const [dayPanel,    setDayPanel]   = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [ctxDupMode,  setCtxDupMode] = useState(false);
+  const [ctxDupDate,  setCtxDupDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
 
   const addRowRef  = useRef<HTMLInputElement>(null);
   const popupRef   = useRef<HTMLDivElement>(null);
@@ -218,9 +226,11 @@ export default function Home() {
   }, [moveEvent]);
 
   /* stats */
-  const overdueN   = events.filter(e => e.status === "overdue").length;
-  const confirmedN = events.filter(e => e.status === "confirmed").length;
-  const pendingN   = events.filter(e => e.status === "pending").length;
+  const overdueN      = events.filter(e => e.status === "overdue").length;
+  const confirmedN    = events.filter(e => e.status === "confirmed").length;
+  const pendingN      = events.filter(e => e.status === "pending").length;
+  const totalEarnings = events.reduce((s, e) => s + (e.earnings ?? 0), 0);
+  const dayEarnings   = events.filter(e => e.date === dayPanel).reduce((s, e) => s + (e.earnings ?? 0), 0);
 
   /* popup position */
   function popupStyle(anchor: DOMRect, w = 300, h = 380): React.CSSProperties {
@@ -264,6 +274,25 @@ export default function Home() {
             <ChevronRight className="w-3.5 h-3.5"/>
           </button>
         </div>
+
+        {/* Earnings badge */}
+        {events.length > 0 && (
+          <div className="flex items-center gap-3 px-3 h-7 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex-shrink-0">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+              <TrendingUp className="w-3 h-3"/>
+              {fmtMoney(totalEarnings)}
+            </span>
+            {dayEarnings > 0 && (
+              <>
+                <div className="w-px h-3.5 bg-emerald-500/30"/>
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400/70">
+                  <CalendarDays className="w-3 h-3"/>
+                  {fmtMoney(dayEarnings)}
+                </span>
+              </>
+            )}
+          </div>
+        )}
 
         <button data-testid="btn-add-row-header"
           onClick={() => setShowAddRow(true)}
@@ -434,7 +463,8 @@ export default function Home() {
               onClose={() => setPopup(null)}
               onStatusChange={status => { updateEvent({ ...popup.event, status }); setPopup(null); }}
               onDelete={() => { deleteEvent(popup.event.id); setPopup(null); }}
-              onSave={upd => { updateEvent(upd); setPopup(null); }}/>
+              onSave={upd => { updateEvent(upd); setPopup(null); }}
+              onDuplicate={date => { addEvent({ ...popup.event, id: genId(), date }); setPopup(null); }}/>
           )}
         </div>
       )}
@@ -459,18 +489,47 @@ export default function Home() {
             </button>
           ))}
           <div className="border-t border-border mt-1 pt-1">
+            {/* Duplicate section */}
+            {!ctxDupMode ? (
+              <button
+                onClick={() => { setCtxDupMode(true); setCtxDupDate(format(new Date(), "yyyy-MM-dd")); }}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left">
+                <Copy className="w-3 h-3 text-muted-foreground"/> Дублировать на день...
+              </button>
+            ) : (
+              <div className="px-3 py-2 space-y-1.5">
+                <p className="text-[10px] text-muted-foreground font-medium">Выберите дату</p>
+                <input type="date" value={ctxDupDate} onChange={e => setCtxDupDate(e.target.value)}
+                  className="w-full text-xs bg-accent/60 border border-border rounded-md px-2 py-1 outline-none focus:border-primary text-foreground"/>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => {
+                      if (!ctxDupDate) return;
+                      addEvent({ ...ctxMenu.event, id: genId(), date: ctxDupDate });
+                      setCtxDupMode(false); setCtxMenu(null);
+                    }}
+                    className="flex-1 text-[10px] font-semibold py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                    Скопировать
+                  </button>
+                  <button onClick={() => setCtxDupMode(false)}
+                    className="px-2 py-1 text-[10px] rounded-md border border-border text-muted-foreground hover:bg-accent transition-colors">
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            )}
             <button
               onClick={() => {
                 const el = document.querySelector(`[data-event-id="${ctxMenu.event.id}"]`);
                 const rect = el?.getBoundingClientRect() ?? new DOMRect(ctxMenu.x, ctxMenu.y, 0, 0);
                 setPopup({ mode:"view", event:ctxMenu.event, anchor:rect });
-                setCtxMenu(null);
+                setCtxMenu(null); setCtxDupMode(false);
               }}
               className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left">
               <Pencil className="w-3 h-3 text-muted-foreground"/> Редактировать
             </button>
             <button
-              onClick={() => { deleteEvent(ctxMenu.event.id); setCtxMenu(null); }}
+              onClick={() => { deleteEvent(ctxMenu.event.id); setCtxMenu(null); setCtxDupMode(false); }}
               className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left text-destructive">
               <Trash2 className="w-3 h-3"/> Удалить
             </button>
@@ -1183,6 +1242,7 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
   const [endTime,   setEndTime]   = useState("10:00");
   const [useTime,   setUseTime]   = useState(false);
   const [icon,      setIcon]      = useState<EventIcon>("none");
+  const [earnings,  setEarnings]  = useState<string>("");
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -1201,7 +1261,8 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
       notes: notes.trim() || undefined,
       startTime: useTime ? startTime : undefined,
       endTime:   useTime ? endTime   : undefined,
-      icon: icon !== "none" ? icon : undefined,
+      icon:     icon !== "none" ? icon : undefined,
+      earnings: earnings ? parseFloat(earnings) : undefined,
     });
   };
 
@@ -1286,6 +1347,16 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: AddEventPopupProps) {
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors resize-none"/>
 
           <IconPicker value={icon} onChange={setIcon}/>
+
+          {/* Earnings */}
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
+            <input
+              type="number" min="0" step="100"
+              value={earnings} onChange={e => setEarnings(e.target.value)}
+              placeholder="Заработок за смену"
+              className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-3 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+          </div>
         </div>
 
         <button data-testid="btn-save-event" onClick={submit} disabled={!title.trim()}
@@ -1307,13 +1378,16 @@ interface ViewPopupProps {
   onSave: (upd: PlannerEvent) => void;
 }
 
-function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPopupProps) {
+function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave, onDuplicate }: ViewPopupProps & { onDuplicate: (date: string) => void }) {
   const [editTitle,    setEditTitle]    = useState(event.title);
   const [editAssignee, setEditAssignee] = useState(event.assignee);
   const [editNotes,    setEditNotes]    = useState(event.notes ?? "");
   const [startTime,    setStartTime]    = useState(event.startTime ?? "");
   const [endTime,      setEndTime]      = useState(event.endTime ?? "");
   const [editIcon,     setEditIcon]     = useState<EventIcon>(event.icon ?? "none");
+  const [editEarnings, setEditEarnings] = useState<string>(event.earnings != null ? String(event.earnings) : "");
+  const [dupMode,      setDupMode]      = useState(false);
+  const [dupDate,      setDupDate]      = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [dirty, setDirty] = useState(false);
 
   const dateLabel = (() => {
@@ -1335,6 +1409,7 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPop
       startTime: startTime || undefined,
       endTime:   endTime   || undefined,
       icon:      editIcon !== "none" ? editIcon : undefined,
+      earnings:  editEarnings ? parseFloat(editEarnings) : undefined,
     });
   };
 
@@ -1398,6 +1473,16 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPop
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors resize-none"/>
 
           <IconPicker value={editIcon} onChange={v => { setEditIcon(v); mark(); }}/>
+
+          {/* Earnings */}
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
+            <input
+              type="number" min="0" step="100"
+              value={editEarnings} onChange={e => { setEditEarnings(e.target.value); mark(); }}
+              placeholder="Заработок за смену"
+              className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-3 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+          </div>
         </div>
 
         {/* Quick status */}
@@ -1436,6 +1521,33 @@ function ViewPopup({ event, onClose, onStatusChange, onDelete, onSave }: ViewPop
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent transition-colors flex-shrink-0">
             <Trash2 className="w-3.5 h-3.5"/>
           </button>
+        </div>
+
+        {/* Duplicate */}
+        <div className="mt-2 border-t border-border pt-2">
+          {!dupMode ? (
+            <button onClick={() => setDupMode(true)}
+              className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg py-1.5 transition-colors">
+              <Copy className="w-3 h-3"/> Дублировать на другой день
+            </button>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-[10px] text-muted-foreground font-medium">Выберите дату для копии</p>
+              <input type="date" value={dupDate} onChange={e => setDupDate(e.target.value)}
+                className="w-full text-xs bg-accent/60 border border-border rounded-md px-2 py-1 outline-none focus:border-primary text-foreground"/>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => { if (dupDate) { onDuplicate(dupDate); setDupMode(false); } }}
+                  className="flex-1 text-[10px] font-semibold py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1">
+                  <Copy className="w-3 h-3"/> Скопировать
+                </button>
+                <button onClick={() => setDupMode(false)}
+                  className="px-2 py-1 text-[10px] rounded-md border border-border text-muted-foreground hover:bg-accent transition-colors">
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
