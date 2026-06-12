@@ -107,8 +107,12 @@ const MONTH_NAMES = [
   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
 ];
 
-/* Module-level drag state */
+/* Module-level drag + clipboard state */
 let activeDrag: { eventId: string; srcEntityId: string; srcDate: string } | null = null;
+/** Tracks the cell the cursor is currently over — updated by every GridCell */
+let hoveredPasteTarget: { entityId: string; date: string } | null = null;
+/** Tracks the event the cursor is over — for Ctrl+C copy */
+let hoveredEventForCopy: PlannerEvent | null = null;
 
 type CtxMenu = { x: number; y: number; event: PlannerEvent } | null;
 type Popup =
@@ -138,6 +142,8 @@ export default function Home() {
   const [ctxDupDate,   setCtxDupDate]   = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
   const [showFinance,  setShowFinance]  = useState(false);
   const [tlCollapsed,  setTlCollapsed]  = useState(false);
+  const [copiedEvent,  setCopiedEvent]  = useState<PlannerEvent | null>(null);
+  const copiedEventRef = useRef<PlannerEvent | null>(null); // always fresh in keyboard handler
 
   const addRowRef  = useRef<HTMLInputElement>(null);
   const popupRef   = useRef<HTMLDivElement>(null);
@@ -162,10 +168,44 @@ export default function Home() {
     return () => cancelAnimationFrame(id);
   }, [currentMonth]);
 
-  /* global Escape / outside-click */
+  /* keep ref in sync with state so keyboard handler always sees latest */
+  useEffect(() => { copiedEventRef.current = copiedEvent; }, [copiedEvent]);
+
+  /* global Escape / outside-click / Ctrl+C / Ctrl+V */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); setShowFinance(false); }
+      /* skip if focus is inside a text field */
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      const isText = tag === "INPUT" || tag === "TEXTAREA";
+
+      if (e.key === "Escape") {
+        setPopup(null); setCtxMenu(null); setShowFinance(false); setCopiedEvent(null);
+        return;
+      }
+      /* Ctrl+C — copy hovered event */
+      if ((e.ctrlKey || e.metaKey) && e.key === "c" && !isText) {
+        const ev = hoveredEventForCopy;
+        if (!ev) return;
+        e.preventDefault();
+        setCopiedEvent({ ...ev });
+        copiedEventRef.current = { ...ev };
+        return;
+      }
+      /* Ctrl+V — paste to hovered cell */
+      if ((e.ctrlKey || e.metaKey) && e.key === "v" && !isText) {
+        const ev = copiedEventRef.current;
+        const target = hoveredPasteTarget;
+        if (!ev || !target) return;
+        e.preventDefault();
+        addEventRef.current({
+          ...ev,
+          id: genId(),
+          entityId: target.entityId,
+          date: target.date,
+          done: false,
+        });
+        return;
+      }
     };
     const onDown = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) setPopup(null);
@@ -185,6 +225,10 @@ export default function Home() {
     setNewEntityName("");
     setShowAddRow(false);
   };
+
+  /* stable ref so the keyboard handler (which runs in a closure) can always call addEvent */
+  const addEventRef = useRef<(ev: PlannerEvent) => void>(addEvent);
+  useEffect(() => { addEventRef.current = addEvent; }, [addEvent]);
 
   const openAdd  = useCallback((entityId: string, date: string, anchor: DOMRect) => {
     setCtxMenu(null); setPopup({ mode: "add", entityId, date, anchor });
@@ -340,6 +384,17 @@ export default function Home() {
           </div>
         )}
 
+        {/* Clipboard badge */}
+        {copiedEvent && (
+          <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 flex-shrink-0 max-w-[160px]">
+            <Copy className="w-3 h-3 flex-shrink-0 animate-pulse"/>
+            <span className="text-[10px] font-semibold truncate">{copiedEvent.title}</span>
+            <button onClick={() => setCopiedEvent(null)} className="flex-shrink-0 ml-0.5 hover:text-white transition-colors">
+              <X className="w-2.5 h-2.5"/>
+            </button>
+          </div>
+        )}
+
         {/* Finance panel toggle */}
         <button
           onClick={() => setShowFinance(v => !v)}
@@ -478,6 +533,7 @@ export default function Home() {
                   onDrop={handleDrop}
                   onDeleteEntity={deleteEntity}
                   onRenameEntity={renameEntity}
+                  copiedEventId={copiedEvent?.id ?? null}
                 />
               ))}
 
@@ -674,6 +730,11 @@ export default function Home() {
             </button>
           ))}
           <div className="border-t border-border mt-1 pt-1">
+            <button
+              onClick={() => { setCopiedEvent(ctxMenu.event); copiedEventRef.current = ctxMenu.event; setCtxMenu(null); }}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left text-sky-300/80 hover:text-sky-300">
+              <Copy className="w-3 h-3"/> Копировать <span className="ml-auto text-[9px] text-muted-foreground/50 font-mono">Ctrl+C</span>
+            </button>
             {!ctxDupMode ? (
               <button
                 onClick={() => { setCtxDupMode(true); setCtxDupDate(format(new Date(), "yyyy-MM-dd")); }}
@@ -742,13 +803,14 @@ interface EntityRowProps {
   onDrop: (tgtEId: string, tgtDate: string) => void;
   onDeleteEntity: (id: string) => void;
   onRenameEntity: (id: string, name: string) => void;
+  copiedEventId: string | null;
 }
 
 function EntityRow({
   entity, days, eventCount, dragOverKey,
   getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick, onDoneToggle,
   onDragStart, onDragEnd, onDragOver, onDrop,
-  onDeleteEntity, onRenameEntity,
+  onDeleteEntity, onRenameEntity, copiedEventId,
 }: EntityRowProps) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(entity.name);
@@ -828,6 +890,7 @@ function EntityRow({
               onDoneToggle={onDoneToggle}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
+              copiedEventId={copiedEventId}
             />
           </td>
         );
@@ -1063,6 +1126,7 @@ interface GridCellProps {
   onDoneToggle: (ev: PlannerEvent) => void;
   onDragStart: (evId: string, srcEId: string, srcDate: string) => void;
   onDragEnd: () => void;
+  copiedEventId: string | null;
 }
 
 function durSpan(start: string, end: string): number {
@@ -1073,11 +1137,15 @@ function durSpan(start: string, end: string): number {
 function GridCell({
   events, entityId, date,
   onAddClick, onEventClick, onContextMenu, onShiftClick, onDoneToggle,
-  onDragStart, onDragEnd,
+  onDragStart, onDragEnd, copiedEventId,
 }: GridCellProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [hoverCard, setHoverCard] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* always keep module-level target in sync with this cell's hover state */
+  const onCellEnter = () => { hoveredPasteTarget = { entityId, date }; };
+  const onCellLeave = () => { if (hoveredPasteTarget?.entityId === entityId && hoveredPasteTarget?.date === date) hoveredPasteTarget = null; };
 
   const showCard = () => {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
@@ -1091,9 +1159,15 @@ function GridCell({
   if (events.length === 0) {
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
+        onMouseEnter={onCellEnter}
+        onMouseLeave={onCellLeave}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className="group/c w-full h-full min-h-[48px] flex items-center justify-center cursor-pointer rounded-md transition-all border border-transparent hover:border-white/[0.08] hover:bg-white/[0.04]">
-        <Plus className="w-3 h-3 text-transparent group-hover/c:text-muted-foreground/30 transition-colors"/>
+        className={`group/c w-full h-full min-h-[48px] flex items-center justify-center cursor-pointer rounded-md transition-all border
+          ${copiedEventId ? "border-sky-500/30 hover:bg-sky-500/10 hover:border-sky-500/50" : "border-transparent hover:border-white/[0.08] hover:bg-white/[0.04]"}`}>
+        {copiedEventId
+          ? <Copy className="w-3 h-3 text-sky-500/40 group-hover/c:text-sky-400/70 transition-colors"/>
+          : <Plus className="w-3 h-3 text-transparent group-hover/c:text-muted-foreground/30 transition-colors"/>
+        }
       </div>
     );
   }
@@ -1111,6 +1185,8 @@ function GridCell({
 
     return (
       <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
+        onMouseEnter={onCellEnter}
+        onMouseLeave={onCellLeave}
         className="relative w-full min-h-[48px] rounded-md overflow-hidden border border-white/10
           bg-white/[0.05] p-1 flex flex-col gap-0.5">
         <div className="w-full h-[5px] rounded-full bg-black/30 relative overflow-hidden flex-shrink-0">
@@ -1175,8 +1251,8 @@ function GridCell({
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
         draggable
-        onMouseEnter={showCard}
-        onMouseLeave={hideCard}
+        onMouseEnter={() => { hoveredPasteTarget = { entityId, date }; hoveredEventForCopy = first; showCard(); }}
+        onMouseLeave={() => { hoveredPasteTarget = null; hoveredEventForCopy = null; hideCard(); }}
         onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHoverCard(false); }}
         onDragEnd={onDragEnd}
         onClick={e => {
@@ -1184,8 +1260,9 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className="relative w-full min-h-[48px] cursor-grab active:cursor-grabbing group/ev rounded-md overflow-hidden
-          transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg select-none"
+        className={`relative w-full min-h-[48px] cursor-grab active:cursor-grabbing group/ev rounded-md overflow-hidden
+          transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg select-none
+          ${copiedEventId === first.id ? "ring-2 ring-sky-400/70 ring-offset-1 ring-offset-background" : ""}`}
         style={{ background: gradient, opacity: first.done ? 0.65 : 1 }}>
 
         {/* Done overlay */}
