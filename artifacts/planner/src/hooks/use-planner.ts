@@ -44,8 +44,9 @@ export function usePlanner(currentMonth: Date) {
   const moveEvent = (eventId: string, newEntityId: string, newDate: string) =>
     setEvts(events.map(ev => ev.id === eventId ? { ...ev, entityId: newEntityId, date: newDate } : ev));
 
-  const getEventsForCell      = (entityId: string, date: string) => events.filter(ev => ev.entityId === entityId && ev.date === date);
-  const getEventCountForEntity = (entityId: string)              => events.filter(ev => ev.entityId === entityId).length;
+  const getEventsForCell       = (entityId: string, date: string) => events.filter(ev => ev.entityId === entityId && ev.date === date);
+  const getEventCountForEntity = (entityId: string)               => events.filter(ev => ev.entityId === entityId).length;
+  const getAllEventsForDay      = (date: string)                   => events.filter(ev => ev.date === date);
 
   const loadDemoData = () => {
     const m = format(new Date(), "yyyy-MM");
@@ -77,7 +78,7 @@ export function usePlanner(currentMonth: Date) {
     entities, events,
     addEntity, deleteEntity, renameEntity,
     addEvent, updateEvent, deleteEvent, moveEvent,
-    getEventsForCell, getEventCountForEntity,
+    getEventsForCell, getEventCountForEntity, getAllEventsForDay,
     loadDemoData,
   };
 }

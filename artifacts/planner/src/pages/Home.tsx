@@ -130,7 +130,7 @@ export default function Home() {
     entities, events,
     addEntity, deleteEntity, renameEntity,
     addEvent, updateEvent, deleteEvent, moveEvent,
-    getEventsForCell, getEventCountForEntity,
+    getEventsForCell, getEventCountForEntity, getAllEventsForDay,
     loadDemoData,
   } = usePlanner(currentMonth);
 
@@ -428,6 +428,13 @@ export default function Home() {
               </tr>
             )}
 
+            {entities.length > 0 && (
+              <DaySummaryRow
+                days={days}
+                entities={entities}
+                getAllEventsForDay={getAllEventsForDay}/>
+            )}
+
             {entities.map(entity => (
               <EntityRow
                 key={entity.id}
@@ -553,13 +560,13 @@ export default function Home() {
         <div ref={popupRef} style={popupStyle(popup.anchor)}>
           {popup.mode === "add" && (
             <AddEventPopup entityId={popup.entityId} date={popup.date}
-              existingEvents={getEventsForCell(popup.entityId, popup.date)}
+              existingEvents={getAllEventsForDay(popup.date)}
               onClose={() => setPopup(null)}
               onAdd={ev => { addEvent(ev); setPopup(null); }}/>
           )}
           {popup.mode === "view" && (
             <ViewPopup event={popup.event}
-              existingEvents={getEventsForCell(popup.event.entityId, popup.event.date)}
+              existingEvents={getAllEventsForDay(popup.event.date)}
               onClose={() => setPopup(null)}
               onStatusChange={status => { updateEvent({ ...popup.event, status }); setPopup(null); }}
               onDelete={() => { deleteEvent(popup.event.id); setPopup(null); }}
@@ -637,6 +644,80 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ─────────────────────── DaySummaryRow ─────────────────────── */
+function DaySummaryRow({ days, entities, getAllEventsForDay }: {
+  days: Date[];
+  entities: Entity[];
+  getAllEventsForDay: (date: string) => PlannerEvent[];
+}) {
+  return (
+    <tr className="border-b-2 border-border/60 bg-white/[0.025]">
+      {/* Label */}
+      <td className="sticky left-0 z-10 bg-[#111827] border-r border-border/30 px-2.5 py-1.5">
+        <div className="flex items-center gap-1.5">
+          <CalendarDays className="w-3 h-3 text-primary/60 flex-shrink-0"/>
+          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">День</span>
+        </div>
+      </td>
+
+      {/* Per-day cells */}
+      {days.map(day => {
+        const dateStr  = format(day, "yyyy-MM-dd");
+        const allEvs   = getAllEventsForDay(dateStr);
+        const timedEvs = allEvs.filter(e => e.startTime && e.endTime);
+        const totalBusy = timedEvs.reduce((s, e) => s + calcDurationMins(e.startTime!, e.endTime!), 0);
+        const freeWorkMins = Math.max(0, 960 - totalBusy); // 6:00–22:00 window
+        const wknd  = isWeekend(day);
+        const tod   = isToday(day);
+        const isMon = day.getDay() === 1;
+
+        return (
+          <td key={dateStr}
+            className={`px-0.5 py-1.5 align-top
+              ${isMon ? "border-l-2 border-l-border/40" : "border-l border-border/10"}
+              ${wknd ? "bg-white/[0.012]" : ""}
+              ${tod  ? "bg-primary/[0.07]" : ""}`}>
+            {timedEvs.length > 0 ? (
+              <div className="px-0.5">
+                {/* Scale ticks */}
+                <div className="flex justify-between px-px mb-0.5">
+                  <span className="text-[6px] text-white/20 leading-none">6</span>
+                  <span className="text-[6px] text-white/20 leading-none">22</span>
+                </div>
+                {/* Timeline bar — entity-colored blocks */}
+                <div className="w-full h-[8px] rounded-sm bg-black/25 relative overflow-hidden mb-1">
+                  {timedEvs.map(ev => {
+                    const ent  = entities.find(e => e.id === ev.entityId);
+                    const left = workPct(ev.startTime!);
+                    const w    = Math.max(3, workPct(ev.endTime!) - left);
+                    return (
+                      <div key={ev.id}
+                        title={`${ent?.name ?? "?"}: ${ev.startTime}–${ev.endTime}`}
+                        className="absolute top-0 bottom-0 cursor-help transition-opacity hover:opacity-80"
+                        style={{ left: `${left}%`, width: `${w}%`, backgroundColor: ent?.color ?? STATUS_COLORS[ev.status] }}/>
+                    );
+                  })}
+                </div>
+                {/* Free / busy label */}
+                <p className={`text-[7px] leading-none text-center font-medium ${
+                  freeWorkMins === 0 ? "text-rose-400/80" : "text-white/30"
+                }`}>
+                  {freeWorkMins > 0
+                    ? `${Math.floor(freeWorkMins / 60)}ч${freeWorkMins % 60 > 0 ? `${freeWorkMins % 60}м` : ""} св.`
+                    : "занято"}
+                </p>
+              </div>
+            ) : null}
+          </td>
+        );
+      })}
+
+      {/* ∑ column */}
+      <td className="border-l border-border/30"/>
+    </tr>
   );
 }
 
