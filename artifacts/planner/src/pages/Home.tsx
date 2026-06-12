@@ -67,6 +67,7 @@ export default function Home() {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [newEntityName, setNewEntityName] = useState("");
   const [showAddRow,  setShowAddRow] = useState(false);
+  const [dayPanel,    setDayPanel]   = useState<string | null>(null);
 
   const addRowRef  = useRef<HTMLInputElement>(null);
   const popupRef   = useRef<HTMLDivElement>(null);
@@ -94,7 +95,7 @@ export default function Home() {
   /* global Escape / outside-click */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); }
+      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); setDayPanel(null); }
     };
     const onDown = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) setPopup(null);
@@ -223,11 +224,15 @@ export default function Home() {
               </th>
               {days.map(day => {
                 const tod = isToday(day), wknd = isWeekend(day);
+                const ds = format(day, "yyyy-MM-dd");
+                const active = dayPanel === ds;
                 return (
                   <th key={day.toISOString()}
                     ref={tod ? todayThRef : undefined}
-                    className={`border-b border-border py-1.5 text-center align-bottom
-                      ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""}`}>
+                    onClick={() => setDayPanel(active ? null : ds)}
+                    className={`border-b border-border py-1.5 text-center align-bottom cursor-pointer transition-colors
+                      hover:bg-primary/10
+                      ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-primary" : ""}`}>
                     <div className="flex flex-col items-center gap-0.5">
                       <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full
                         ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/70" : "text-foreground"}`}>
@@ -341,6 +346,16 @@ export default function Home() {
         </div>
         <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
       </footer>
+
+      {/* ── Day Timeline Panel ── */}
+      {dayPanel && (
+        <DayTimelinePanel
+          date={dayPanel}
+          entities={entities}
+          getEventsForCell={getEventsForCell}
+          onClose={() => setDayPanel(null)}
+        />
+      )}
 
       {/* ── Popup ── */}
       {popup && (
@@ -517,6 +532,206 @@ function EntityRow({
         }
       </td>
     </tr>
+  );
+}
+
+/* ─────────────────────── DayTimelinePanel ─────────────────────── */
+const HOUR_H = 52; // px per hour → 24 * 52 = 1248px total
+
+function DayTimelinePanel({
+  date, entities, getEventsForCell, onClose,
+}: {
+  date: string;
+  entities: Entity[];
+  getEventsForCell: (entityId: string, date: string) => PlannerEvent[];
+  onClose: () => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const dateLabel = (() => {
+    try { return format(parseISO(date), "EEEE, d MMMM yyyy", { locale: ru }); } catch { return date; }
+  })();
+
+  /* auto-scroll to 7 am on open */
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 7 * HOUR_H - 20;
+  }, [date]);
+
+  /* current-time line */
+  const now = new Date();
+  const todayStr = format(now, "yyyy-MM-dd");
+  const isToday = date === todayStr;
+  const nowY = isToday ? (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_H : null;
+
+  function timeToY(t: string) {
+    const [h, m] = t.split(":").map(Number);
+    return (h * 60 + m) / 60 * HOUR_H;
+  }
+  function durY(s: string, e: string) {
+    const [sh, sm] = s.split(":").map(Number);
+    const [eh, em] = e.split(":").map(Number);
+    return Math.max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_H, 14);
+  }
+
+  /* busy minutes per entity */
+  function busyMins(entity: Entity) {
+    return getEventsForCell(entity.id, date)
+      .filter(ev => ev.startTime && ev.endTime)
+      .reduce((acc, ev) => {
+        const [sh, sm] = ev.startTime!.split(":").map(Number);
+        const [eh, em] = ev.endTime!.split(":").map(Number);
+        return acc + (eh * 60 + em) - (sh * 60 + sm);
+      }, 0);
+  }
+
+  const hours = Array.from({ length: 25 }, (_, i) => i);
+  const hasAnyTimedEvent = entities.some(e =>
+    getEventsForCell(e.id, date).some(ev => ev.startTime && ev.endTime)
+  );
+
+  return (
+    <div className="fixed inset-y-0 right-0 flex flex-col bg-card border-l border-border shadow-2xl z-40"
+      style={{ width: Math.min(460, 56 + entities.length * 80) }}>
+
+      {/* Header */}
+      <div className="flex items-start justify-between px-4 pt-3 pb-2.5 border-b border-border flex-shrink-0">
+        <div>
+          <p className="text-sm font-semibold capitalize leading-tight">{dateLabel}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            {hasAnyTimedEvent
+              ? `Кликните событие для деталей · ${entities.filter(e => busyMins(e) > 0).length} объект(ов) заняты`
+              : "Нет событий с временем — добавьте время в событие"
+            }
+          </p>
+        </div>
+        <button onClick={onClose}
+          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0 ml-2">
+          <X className="w-3.5 h-3.5"/>
+        </button>
+      </div>
+
+      {/* Entity column headers */}
+      <div className="flex flex-shrink-0 border-b border-border" style={{ paddingLeft: 56 }}>
+        {entities.map(entity => {
+          const busy = busyMins(entity);
+          const freeH = 24 - busy / 60;
+          return (
+            <div key={entity.id} className="flex-1 px-1.5 py-2 border-r border-border/40 last:border-r-0 min-w-0">
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
+                <span className="text-[9px] font-semibold text-foreground truncate">{entity.name}</span>
+              </div>
+              {busy > 0 ? (
+                <p className="text-[8px] text-muted-foreground leading-tight">
+                  <span className="text-foreground font-medium">{Math.floor(busy/60)}ч{busy%60>0?` ${busy%60}м`:""}</span>
+                  {" "}занято · {Math.floor(freeH)}ч свободно
+                </p>
+              ) : (
+                <p className="text-[8px] text-muted-foreground/50">Свободен</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Scrollable timeline */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="flex" style={{ height: 24 * HOUR_H }}>
+
+          {/* Hour labels column */}
+          <div className="flex-shrink-0 relative" style={{ width: 56 }}>
+            {hours.map(h => (
+              <div key={h} className="absolute left-0 right-0 flex items-start justify-end pr-2"
+                style={{ top: h * HOUR_H, height: HOUR_H }}>
+                <span className="text-[9px] text-muted-foreground/50 font-mono leading-none pt-0.5">
+                  {h < 24 ? `${String(h).padStart(2,"0")}:00` : ""}
+                </span>
+              </div>
+            ))}
+            {/* Current time label */}
+            {nowY !== null && (
+              <div className="absolute right-1 flex items-center" style={{ top: nowY - 6 }}>
+                <span className="text-[8px] text-red-400 font-mono font-bold">
+                  {String(now.getHours()).padStart(2,"0")}:{String(now.getMinutes()).padStart(2,"0")}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Entity lanes */}
+          {entities.map(entity => {
+            const evs = getEventsForCell(entity.id, date);
+            const timedEvs  = evs.filter(ev => ev.startTime && ev.endTime);
+            const untimedEvs = evs.filter(ev => !ev.startTime);
+
+            return (
+              <div key={entity.id} className="flex-1 relative border-r border-border/30 last:border-r-0 min-w-0">
+                {/* Hour grid lines */}
+                {hours.map(h => (
+                  <div key={h} className="absolute left-0 right-0 border-t pointer-events-none"
+                    style={{ top: h * HOUR_H, borderColor: h % 6 === 0 ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)" }}/>
+                ))}
+                {/* Half-hour lines */}
+                {hours.slice(0, 24).map(h => (
+                  <div key={`h${h}`} className="absolute left-0 right-0 border-t border-dashed pointer-events-none"
+                    style={{ top: h * HOUR_H + HOUR_H / 2, borderColor: "rgba(255,255,255,0.03)" }}/>
+                ))}
+
+                {/* Current time indicator */}
+                {nowY !== null && (
+                  <div className="absolute left-0 right-0 h-px bg-red-400/70 z-20 pointer-events-none"
+                    style={{ top: nowY }}/>
+                )}
+
+                {/* Free time highlight (subtle) */}
+                <div className="absolute inset-0 pointer-events-none"
+                  style={{ background: "linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.01) 100%)" }}/>
+
+                {/* Timed event blocks */}
+                {timedEvs.map(ev => {
+                  const top    = timeToY(ev.startTime!);
+                  const height = durY(ev.startTime!, ev.endTime!);
+                  const color  = STATUS_COLORS[ev.status];
+                  const dur    = calcDuration(ev.startTime!, ev.endTime!);
+                  return (
+                    <div key={ev.id}
+                      className="absolute left-1 right-1 rounded-md overflow-hidden cursor-pointer group/block
+                        hover:brightness-110 hover:z-10 transition-all"
+                      style={{ top: top + 1, height: height - 2, backgroundColor: color, zIndex: 5 }}>
+                      <div className="h-full flex flex-col px-1.5 py-1 overflow-hidden">
+                        <p className="text-[9px] font-bold text-white leading-tight truncate flex-shrink-0">
+                          {ev.title}
+                        </p>
+                        {height >= 30 && (
+                          <p className="text-[8px] text-white/80 leading-none mt-0.5 flex-shrink-0">
+                            {ev.startTime} – {ev.endTime}
+                          </p>
+                        )}
+                        {height >= 44 && (
+                          <p className="text-[8px] text-white/60 leading-none mt-0.5 flex-shrink-0">{dur}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Untimed events — top strip */}
+                {untimedEvs.length > 0 && (
+                  <div className="absolute top-1 left-1 right-1 flex flex-col gap-0.5 z-10">
+                    {untimedEvs.map(ev => (
+                      <div key={ev.id} className="rounded px-1 py-0.5 opacity-70"
+                        style={{ backgroundColor: STATUS_COLORS[ev.status] }}>
+                        <p className="text-[8px] text-white font-medium leading-none truncate">{ev.title}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
