@@ -30,6 +30,14 @@ export interface PlannerEvent {
   endTime?: string;   // "HH:MM"
   icon?: EventIcon;
   earnings?: number;  // руб. за смену
+  expenses?: number;  // руб. трат
+  done?: boolean;     // выполнено
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  amount: number;
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {

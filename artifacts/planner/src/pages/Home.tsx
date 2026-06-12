@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   addMonths, subMonths, isToday, isWeekend, parseISO,
+  startOfWeek, endOfWeek,
 } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
@@ -9,10 +10,12 @@ import {
   Pencil, Trash2, RotateCcw, Sparkles, Clock,
   Dumbbell, Briefcase, Star, Car, UtensilsCrossed,
   Copy, TrendingUp, CalendarDays, AlertTriangle,
+  Wallet, Target, ChevronDown, ChevronUp, BadgeCheck,
+  ArrowUpRight, ArrowDownRight, Minus, Trophy,
 } from "lucide-react";
 import { usePlanner } from "../hooks/use-planner";
 import {
-  Entity, PlannerEvent, EventStatus, EventIcon,
+  Entity, PlannerEvent, Goal, EventStatus, EventIcon,
   STATUS_COLORS, STATUS_GRADIENTS, STATUS_LABELS, STATUS_CYCLE,
   EVENT_ICON_LABELS,
   calcDuration, calcDurationMins, fmtTime, addMinutes, hasTimeOverlap, timeToMins,
@@ -42,7 +45,7 @@ const EVENT_ICONS: Record<EventIcon, React.ReactNode> = {
 
 const ICON_LIST: EventIcon[] = ["none","gym","ozon","briefcase","star","car","food"];
 
-/* ── Inline icon renderer (white, size controlled by parent) ── */
+/* ── Inline icon renderer ── */
 function EventIconBadge({ icon, size = 10 }: { icon: EventIcon; size?: number }) {
   if (!icon || icon === "none") return null;
   if (icon === "ozon") return <OzonIcon size={size}/>;
@@ -87,20 +90,12 @@ function fmtMoney(n: number): string {
   return n.toLocaleString("ru-RU") + " ₽";
 }
 
-/** Convert "HH:MM" to 0–100% within a 6:00–22:00 window for the time strip */
+/** Convert "HH:MM" to 0–100% within a 6:00–22:00 window */
 function workPct(t: string): number {
   try {
     const [h, m] = t.split(":").map(Number);
     const min = h * 60 + m;
-    return Math.max(0, Math.min(100, ((min - 360) / 960) * 100)); // 360=6h, 960=16h span
-  } catch { return 0; }
-}
-
-/** Full 24-hour pct for the tooltip timeline */
-function timePct(t: string): number {
-  try {
-    const [h, m] = t.split(":").map(Number);
-    return ((h * 60 + m) / 1440) * 100;
+    return Math.max(0, Math.min(100, ((min - 360) / 960) * 100));
   } catch { return 0; }
 }
 
@@ -112,10 +107,8 @@ const MONTH_NAMES = [
   "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь",
 ];
 
-/* Module-level drag state — no re-renders needed */
+/* Module-level drag state */
 let activeDrag: { eventId: string; srcEntityId: string; srcDate: string } | null = null;
-/* Module-level tooltip gate — only ONE tooltip visible at any time */
-let tooltipOwnerId: string | null = null;
 
 type CtxMenu = { x: number; y: number; event: PlannerEvent } | null;
 type Popup =
@@ -127,21 +120,24 @@ type Popup =
 export default function Home() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const {
-    entities, events,
+    entities, events, goals,
     addEntity, deleteEntity, renameEntity,
     addEvent, updateEvent, deleteEvent, moveEvent,
     getEventsForCell, getEventCountForEntity, getAllEventsForDay,
+    addGoal, updateGoal, deleteGoal,
     loadDemoData,
   } = usePlanner(currentMonth);
 
-  const [popup,      setPopup]      = useState<Popup>(null);
-  const [ctxMenu,    setCtxMenu]    = useState<CtxMenu>(null);
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [popup,        setPopup]        = useState<Popup>(null);
+  const [ctxMenu,      setCtxMenu]      = useState<CtxMenu>(null);
+  const [dragOverKey,  setDragOverKey]  = useState<string | null>(null);
   const [newEntityName, setNewEntityName] = useState("");
-  const [showAddRow,  setShowAddRow] = useState(false);
-  const [dayPanel,    setDayPanel]   = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
-  const [ctxDupMode,  setCtxDupMode] = useState(false);
-  const [ctxDupDate,  setCtxDupDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [showAddRow,   setShowAddRow]   = useState(false);
+  const [dayPanel,     setDayPanel]     = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [ctxDupMode,   setCtxDupMode]   = useState(false);
+  const [ctxDupDate,   setCtxDupDate]   = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
+  const [showFinance,  setShowFinance]  = useState(false);
+  const [tlCollapsed,  setTlCollapsed]  = useState(false);
 
   const addRowRef  = useRef<HTMLInputElement>(null);
   const popupRef   = useRef<HTMLDivElement>(null);
@@ -166,25 +162,10 @@ export default function Home() {
     return () => cancelAnimationFrame(id);
   }, [currentMonth]);
 
-  /* Wheel → horizontal scroll (hide scrollbar, use wheel instead) */
-  useEffect(() => {
-    const el = gridRef.current;
-    if (!el) return;
-    const handler = (e: WheelEvent) => {
-      if (e.deltaX !== 0) return;           // native horizontal gesture — pass through
-      if (Math.abs(e.deltaY) > 2) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY * 1.8;
-      }
-    };
-    el.addEventListener("wheel", handler, { passive: false });
-    return () => el.removeEventListener("wheel", handler);
-  }, []);
-
   /* global Escape / outside-click */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); }
+      if (e.key === "Escape") { setPopup(null); setCtxMenu(null); setShowFinance(false); }
     };
     const onDown = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) setPopup(null);
@@ -218,6 +199,10 @@ export default function Home() {
     setCtxMenu({ x: e.clientX, y: e.clientY, event });
   }, []);
 
+  const handleDoneToggle = useCallback((ev: PlannerEvent) => {
+    updateEvent({ ...ev, done: !ev.done, status: !ev.done ? "confirmed" : ev.status });
+  }, [updateEvent]);
+
   /* drag handlers */
   const handleDragStart = useCallback((eventId: string, srcEntityId: string, srcDate: string) => {
     activeDrag = { eventId, srcEntityId, srcDate };
@@ -247,9 +232,10 @@ export default function Home() {
   const confirmedN    = events.filter(e => e.status === "confirmed").length;
   const pendingN      = events.filter(e => e.status === "pending").length;
   const totalEarnings = events.reduce((s, e) => s + (e.earnings ?? 0), 0);
+  const totalExpenses = events.reduce((s, e) => s + (e.expenses ?? 0), 0);
   const dayEarnings   = events.filter(e => e.date === dayPanel).reduce((s, e) => s + (e.earnings ?? 0), 0);
 
-  /* Week grouping — split days into Mon-Sun chunks */
+  /* Week grouping */
   const weekGroups = (() => {
     const groups: Date[][] = [];
     let cur: Date[] = [];
@@ -266,6 +252,22 @@ export default function Home() {
     const e = format(wDays[wDays.length - 1], "yyyy-MM-dd");
     return events.filter(ev => ev.date >= s && ev.date <= e).reduce((sum, ev) => sum + (ev.earnings ?? 0), 0);
   };
+
+  const weekExpenses = (wDays: Date[]): number => {
+    const s = format(wDays[0], "yyyy-MM-dd");
+    const e = format(wDays[wDays.length - 1], "yyyy-MM-dd");
+    return events.filter(ev => ev.date >= s && ev.date <= e).reduce((sum, ev) => sum + (ev.expenses ?? 0), 0);
+  };
+
+  /* Current week earnings/expenses for finance panel */
+  const now = new Date();
+  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const weekEnd   = endOfWeek(now, { weekStartsOn: 1 });
+  const weekStartStr = format(weekStart, "yyyy-MM-dd");
+  const weekEndStr   = format(weekEnd, "yyyy-MM-dd");
+  const thisWeekEvents   = events.filter(ev => ev.date >= weekStartStr && ev.date <= weekEndStr);
+  const thisWeekEarnings = thisWeekEvents.reduce((s, e) => s + (e.earnings ?? 0), 0);
+  const thisWeekExpenses = thisWeekEvents.reduce((s, e) => s + (e.expenses ?? 0), 0);
 
   /* popup position */
   function popupStyle(anchor: DOMRect, w = 300, h = 380): React.CSSProperties {
@@ -317,6 +319,15 @@ export default function Home() {
               <TrendingUp className="w-3 h-3"/>
               {fmtMoney(totalEarnings)}
             </span>
+            {totalExpenses > 0 && (
+              <>
+                <div className="w-px h-3.5 bg-emerald-500/30"/>
+                <span className="flex items-center gap-1 text-[10px] text-rose-400/80">
+                  <ArrowDownRight className="w-3 h-3"/>
+                  {fmtMoney(totalExpenses)}
+                </span>
+              </>
+            )}
             {dayEarnings > 0 && (
               <>
                 <div className="w-px h-3.5 bg-emerald-500/30"/>
@@ -329,6 +340,14 @@ export default function Home() {
           </div>
         )}
 
+        {/* Finance panel toggle */}
+        <button
+          onClick={() => setShowFinance(v => !v)}
+          className={`flex items-center gap-1.5 text-xs font-medium px-3 h-7 rounded-md transition-colors flex-shrink-0
+            ${showFinance ? "bg-violet-500/20 text-violet-400 border border-violet-500/30" : "bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80"}`}>
+          <Wallet className="w-3.5 h-3.5"/> Финансы
+        </button>
+
         <button data-testid="btn-add-row-header"
           onClick={() => setShowAddRow(true)}
           className="flex items-center gap-1.5 text-xs font-medium px-3 h-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex-shrink-0">
@@ -336,171 +355,198 @@ export default function Home() {
         </button>
       </header>
 
-      {/* ── Grid ── */}
-      <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
-        <table className="border-collapse" style={{ tableLayout: "fixed" }}>
-          <colgroup>
-            <col style={{ width: 210, minWidth: 210 }}/>
-            {days.map(d => <col key={d.toISOString()} style={{ width: 58, minWidth: 58 }}/>)}
-            <col style={{ width: 44, minWidth: 44 }}/>
-          </colgroup>
+      {/* ── Main content area ── */}
+      <div className="flex flex-1 min-h-0">
 
-          <thead className="sticky top-0 z-20">
-            {/* ── Week labels row ── */}
-            <tr>
-              <th className="bg-card border-b border-border/30 border-r border-border px-3"/>
-              {weekGroups.map(wDays => {
-                const isFirst = wDays === weekGroups[0];
-                const wEarn   = weekEarnings(wDays);
-                const label   = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
-                return (
-                  <th key={wDays[0].toISOString()} colSpan={wDays.length}
-                    className={`bg-card border-b border-border/30 py-0.5 px-1 text-center
-                      ${!isFirst ? "border-l-2 border-l-border/50" : ""}`}>
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                      <span className="text-[8px] text-muted-foreground/50 font-medium">{label}</span>
-                      {wEarn > 0 && (
-                        <span className="text-[8px] font-bold text-emerald-400">
-                          {fmtMoney(wEarn)}
+        {/* ── Grid ── */}
+        <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
+          <table className="border-collapse" style={{ tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: 210, minWidth: 210 }}/>
+              {days.map(d => <col key={d.toISOString()} style={{ width: 58, minWidth: 58 }}/>)}
+              <col style={{ width: 44, minWidth: 44 }}/>
+            </colgroup>
+
+            <thead className="sticky top-0 z-20">
+              {/* ── Week labels row ── */}
+              <tr>
+                <th className="bg-card border-b border-border/30 border-r border-border px-3"/>
+                {weekGroups.map(wDays => {
+                  const isFirst = wDays === weekGroups[0];
+                  const wEarn   = weekEarnings(wDays);
+                  const wExp    = weekExpenses(wDays);
+                  const label   = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
+                  return (
+                    <th key={wDays[0].toISOString()} colSpan={wDays.length}
+                      className={`bg-card border-b border-border/30 py-1.5 px-1 text-center
+                        ${!isFirst ? "border-l-2 border-l-border/50" : ""}`}>
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-muted-foreground/60 font-semibold">{label}</span>
+                        {wEarn > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-400">
+                            +{fmtMoney(wEarn)}
+                          </span>
+                        )}
+                        {wExp > 0 && (
+                          <span className="text-[9px] font-semibold text-rose-400/70">
+                            -{fmtMoney(wExp)}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
+                <th className="bg-card border-b border-border/30 border-l border-border"/>
+              </tr>
+
+              {/* ── Day numbers row ── */}
+              <tr>
+                <th className="bg-card border-b border-r border-border px-3 py-1.5 text-left align-bottom">
+                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Объект</span>
+                </th>
+                {days.map(day => {
+                  const tod   = isToday(day), wknd = isWeekend(day);
+                  const isMon = day.getDay() === 1;
+                  const ds    = format(day, "yyyy-MM-dd");
+                  const active = dayPanel === ds;
+                  return (
+                    <th key={day.toISOString()}
+                      ref={tod ? todayThRef : undefined}
+                      onClick={() => setDayPanel(active ? format(new Date(), "yyyy-MM-dd") : ds)}
+                      className={`border-b border-border py-1 text-center align-bottom cursor-pointer transition-colors
+                        hover:bg-primary/10
+                        ${isMon ? "border-l-2 border-l-border/60" : ""}
+                        ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-b-primary" : ""}`}>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full
+                          ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/70" : "text-foreground"}`}>
+                          {format(day, "d")}
                         </span>
-                      )}
-                    </div>
-                  </th>
-                );
-              })}
-              <th className="bg-card border-b border-border/30 border-l border-border"/>
-            </tr>
+                        <span className={`text-[8px] font-medium ${wknd ? "text-muted-foreground/50" : "text-muted-foreground/70"}`}>
+                          {DAY_ABBR[day.getDay()]}
+                        </span>
+                      </div>
+                    </th>
+                  );
+                })}
+                <th className="bg-card border-b border-l border-border py-1 text-center">
+                  <span className="text-[9px] text-muted-foreground/50 uppercase">∑</span>
+                </th>
+              </tr>
+            </thead>
 
-            {/* ── Day numbers row ── */}
-            <tr>
-              <th className="bg-card border-b border-r border-border px-3 py-1.5 text-left align-bottom">
-                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Объект</span>
-              </th>
-              {days.map(day => {
-                const tod   = isToday(day), wknd = isWeekend(day);
-                const isMon = day.getDay() === 1;
-                const ds    = format(day, "yyyy-MM-dd");
-                const active = dayPanel === ds;
-                return (
-                  <th key={day.toISOString()}
-                    ref={tod ? todayThRef : undefined}
-                    onClick={() => setDayPanel(active ? format(new Date(), "yyyy-MM-dd") : ds)}
-                    className={`border-b border-border py-1 text-center align-bottom cursor-pointer transition-colors
-                      hover:bg-primary/10
-                      ${isMon ? "border-l-2 border-l-border/60" : ""}
-                      ${wknd ? "bg-background" : "bg-card"} ${tod ? "bg-primary/10" : ""} ${active ? "bg-primary/20 border-b-2 border-b-primary" : ""}`}>
-                    <div className="flex flex-col items-center gap-0.5">
-                      <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full
-                        ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/70" : "text-foreground"}`}>
-                        {format(day, "d")}
+            <tbody>
+              {entities.length === 0 && (
+                <tr>
+                  <td colSpan={days.length + 2} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-primary"/>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium mb-1">Нет данных</p>
+                        <p className="text-xs text-muted-foreground">Добавьте строку или загрузите демо</p>
+                      </div>
+                      <button data-testid="btn-demo" onClick={loadDemoData}
+                        className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium">
+                        <Sparkles className="w-3.5 h-3.5"/> Загрузить демо-данные
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {entities.map(entity => (
+                <EntityRow
+                  key={entity.id}
+                  entity={entity}
+                  days={days}
+                  eventCount={getEventCountForEntity(entity.id)}
+                  getEventsForCell={getEventsForCell}
+                  dragOverKey={dragOverKey}
+                  onCellClick={openAdd}
+                  onEventClick={openView}
+                  onContextMenu={openCtx}
+                  onShiftClick={ev => {
+                    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(ev.status) + 1) % STATUS_CYCLE.length];
+                    updateEvent({ ...ev, status: next });
+                  }}
+                  onDoneToggle={handleDoneToggle}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onDeleteEntity={deleteEntity}
+                  onRenameEntity={renameEntity}
+                />
+              ))}
+
+              {/* ── Add entity row ── */}
+              {showAddRow ? (
+                <tr>
+                  <td colSpan={days.length + 2}
+                    className="border-t-2 border-primary/30 bg-primary/5 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <Plus className="w-3.5 h-3.5 text-primary"/>
+                      </div>
+                      <input ref={addRowRef} data-testid="input-new-entity"
+                        value={newEntityName}
+                        onChange={e => setNewEntityName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") handleAddEntity();
+                          if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
+                        }}
+                        placeholder="Название объекта (Enter для добавления)..."
+                        className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50"/>
+                      <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground
+                          hover:bg-primary/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                        Добавить
+                      </button>
+                      <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                        <X className="w-3.5 h-3.5"/>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={days.length + 2}
+                    onClick={() => setShowAddRow(true)}
+                    className="border-t border-dashed border-border/40 cursor-pointer group/add hover:bg-primary/5 transition-colors">
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <div className="w-5 h-5 rounded-md border-2 border-dashed border-border/40
+                        group-hover/add:border-primary/50 flex items-center justify-center transition-colors">
+                        <Plus className="w-3 h-3 text-muted-foreground/30 group-hover/add:text-primary/70 transition-colors"/>
+                      </div>
+                      <span className="text-xs text-muted-foreground/40 group-hover/add:text-primary/70 transition-colors">
+                        Добавить объект
                       </span>
-                      <span className={`text-[8px] font-medium ${wknd ? "text-muted-foreground/50" : "text-muted-foreground/70"}`}>
-                        {DAY_ABBR[day.getDay()]}
-                      </span>
                     </div>
-                  </th>
-                );
-              })}
-              <th className="bg-card border-b border-l border-border py-1 text-center">
-                <span className="text-[9px] text-muted-foreground/50 uppercase">∑</span>
-              </th>
-            </tr>
-          </thead>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          <tbody>
-            {entities.length === 0 && (
-              <tr>
-                <td colSpan={days.length + 2} className="py-16 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-primary"/>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium mb-1">Нет данных</p>
-                      <p className="text-xs text-muted-foreground">Добавьте строку или загрузите демо</p>
-                    </div>
-                    <button data-testid="btn-demo" onClick={loadDemoData}
-                      className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium">
-                      <Sparkles className="w-3.5 h-3.5"/> Загрузить демо-данные
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            )}
-
-            {entities.map(entity => (
-              <EntityRow
-                key={entity.id}
-                entity={entity}
-                days={days}
-                eventCount={getEventCountForEntity(entity.id)}
-                getEventsForCell={getEventsForCell}
-                dragOverKey={dragOverKey}
-                onCellClick={openAdd}
-                onEventClick={openView}
-                onContextMenu={openCtx}
-                onShiftClick={ev => {
-                  const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(ev.status) + 1) % STATUS_CYCLE.length];
-                  updateEvent({ ...ev, status: next });
-                }}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onDeleteEntity={deleteEntity}
-                onRenameEntity={renameEntity}
-              />
-            ))}
-
-            {/* ── Add entity row ── */}
-            {showAddRow ? (
-              <tr>
-                <td colSpan={days.length + 2}
-                  className="border-t-2 border-primary/30 bg-primary/5 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <Plus className="w-3.5 h-3.5 text-primary"/>
-                    </div>
-                    <input ref={addRowRef} data-testid="input-new-entity"
-                      value={newEntityName}
-                      onChange={e => setNewEntityName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") handleAddEntity();
-                        if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
-                      }}
-                      placeholder="Название объекта (Enter для добавления)..."
-                      className="flex-1 text-sm bg-transparent outline-none text-foreground placeholder:text-muted-foreground/50"/>
-                    <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-primary text-primary-foreground
-                        hover:bg-primary/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                      Добавить
-                    </button>
-                    <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                      <X className="w-3.5 h-3.5"/>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              <tr>
-                <td colSpan={days.length + 2}
-                  onClick={() => setShowAddRow(true)}
-                  className="border-t border-dashed border-border/40 cursor-pointer group/add hover:bg-primary/5 transition-colors">
-                  <div className="flex items-center gap-2 px-3 py-2">
-                    <div className="w-5 h-5 rounded-md border-2 border-dashed border-border/40
-                      group-hover/add:border-primary/50 flex items-center justify-center transition-colors">
-                      <Plus className="w-3 h-3 text-muted-foreground/30 group-hover/add:text-primary/70 transition-colors"/>
-                    </div>
-                    <span className="text-xs text-muted-foreground/40 group-hover/add:text-primary/70 transition-colors">
-                      Добавить объект
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        {/* ── Finance panel (right side) ── */}
+        {showFinance && (
+          <FinancePanel
+            events={events}
+            goals={goals}
+            totalEarnings={totalEarnings}
+            totalExpenses={totalExpenses}
+            thisWeekEarnings={thisWeekEarnings}
+            thisWeekExpenses={thisWeekExpenses}
+            onClose={() => setShowFinance(false)}
+            onAddGoal={addGoal}
+            onUpdateGoal={updateGoal}
+            onDeleteGoal={deleteGoal}
+          />
+        )}
       </div>
 
       {/* ── Day schedule panel ── */}
@@ -510,25 +556,26 @@ export default function Home() {
           entities={entities}
           getEventsForCell={getEventsForCell}
           onDayReset={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
+          collapsed={tlCollapsed}
+          onToggleCollapse={() => setTlCollapsed(v => !v)}
         />
       )}
 
       {/* ── Status bar ── */}
       <footer className="border-t border-border flex-shrink-0">
-        {/* Weekly earnings strip */}
         {totalEarnings > 0 && (
           <div className="flex items-center gap-3 px-4 py-2 border-b border-border/40 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {/* Week cards */}
             {(() => {
               const maxW = Math.max(...weekGroups.map(w => weekEarnings(w)), 1);
               return weekGroups.map((wDays, i) => {
-                const earn  = weekEarnings(wDays);
+                const earn    = weekEarnings(wDays);
+                const exp     = weekExpenses(wDays);
+                const net     = earn - exp;
                 const pctFill = (earn / maxW) * 100;
-                const label = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
+                const label   = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
                 return (
                   <div key={i} className="flex-shrink-0 relative rounded-lg border border-border/40 bg-background/50 overflow-hidden"
-                    style={{ minWidth: 88 }}>
-                    {/* Proportional fill bar at bottom */}
+                    style={{ minWidth: 96 }}>
                     <div className="absolute bottom-0 left-0 h-0.5 rounded-full transition-all"
                       style={{ width: `${pctFill}%`, backgroundColor: earn > 0 ? "rgb(52,211,153)" : "transparent" }}/>
                     <div className="px-3 py-1.5">
@@ -536,18 +583,27 @@ export default function Home() {
                       <p className={`text-[13px] font-bold leading-none tabular-nums ${earn > 0 ? "text-emerald-400" : "text-muted-foreground/25"}`}>
                         {earn > 0 ? fmtMoney(earn) : "—"}
                       </p>
+                      {exp > 0 && (
+                        <p className="text-[9px] text-rose-400/70 leading-none mt-0.5 tabular-nums">
+                          -{fmtMoney(exp)} · чист. {fmtMoney(net)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
               });
             })()}
 
-            {/* Month total */}
             <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 ml-auto">
               <TrendingUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"/>
               <div>
                 <p className="text-[9px] text-emerald-400/60 leading-none mb-0.5">За месяц</p>
                 <p className="text-[14px] font-bold text-emerald-400 leading-none tabular-nums">{fmtMoney(totalEarnings)}</p>
+                {totalExpenses > 0 && (
+                  <p className="text-[9px] text-rose-400/70 leading-none mt-0.5 tabular-nums">
+                    -{fmtMoney(totalExpenses)} = {fmtMoney(totalEarnings - totalExpenses)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -565,7 +621,7 @@ export default function Home() {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm" style={{ backgroundColor: STATUS_COLORS.pending }}/>{pendingN}</span>
             <span className="border-l border-border pl-4">Всего: <strong className="text-foreground">{events.length}</strong></span>
           </div>
-          <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести</span>
+          <span className="text-[10px] text-muted-foreground/40 ml-2 hidden lg:block">Shift+клик = статус · ПКМ = меню · Перетащи = перенести · ✓ = выполнить</span>
         </div>
       </footer>
 
@@ -600,6 +656,14 @@ export default function Home() {
             <p className="text-[11px] font-semibold text-foreground truncate">{ctxMenu.event.title}</p>
             <p className="text-[10px] text-muted-foreground">{ctxMenu.event.date}</p>
           </div>
+          {/* Done toggle */}
+          <button
+            onClick={() => { handleDoneToggle(ctxMenu.event); setCtxMenu(null); }}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left">
+            <BadgeCheck className={`w-3 h-3 ${ctxMenu.event.done ? "text-emerald-400" : "text-muted-foreground"}`}/>
+            {ctxMenu.event.done ? "Снять отметку выполнения" : "Отметить выполненным"}
+          </button>
+          <div className="border-t border-border/50 my-1"/>
           {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
             <button key={s}
               onClick={() => { updateEvent({ ...ctxMenu.event, status: s }); setCtxMenu(null); }}
@@ -610,7 +674,6 @@ export default function Home() {
             </button>
           ))}
           <div className="border-t border-border mt-1 pt-1">
-            {/* Duplicate section */}
             {!ctxDupMode ? (
               <button
                 onClick={() => { setCtxDupMode(true); setCtxDupDate(format(new Date(), "yyyy-MM-dd")); }}
@@ -661,80 +724,6 @@ export default function Home() {
   );
 }
 
-/* ─────────────────────── DaySummaryRow ─────────────────────── */
-function DaySummaryRow({ days, entities, getAllEventsForDay }: {
-  days: Date[];
-  entities: Entity[];
-  getAllEventsForDay: (date: string) => PlannerEvent[];
-}) {
-  return (
-    <tr className="border-b-2 border-border/60 bg-white/[0.025]">
-      {/* Label */}
-      <td className="sticky left-0 z-10 bg-[#111827] border-r border-border/30 px-2.5 py-1.5">
-        <div className="flex items-center gap-1.5">
-          <CalendarDays className="w-3 h-3 text-primary/60 flex-shrink-0"/>
-          <span className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">День</span>
-        </div>
-      </td>
-
-      {/* Per-day cells */}
-      {days.map(day => {
-        const dateStr  = format(day, "yyyy-MM-dd");
-        const allEvs   = getAllEventsForDay(dateStr);
-        const timedEvs = allEvs.filter(e => e.startTime && e.endTime);
-        const totalBusy = timedEvs.reduce((s, e) => s + calcDurationMins(e.startTime!, e.endTime!), 0);
-        const freeWorkMins = Math.max(0, 960 - totalBusy); // 6:00–22:00 window
-        const wknd  = isWeekend(day);
-        const tod   = isToday(day);
-        const isMon = day.getDay() === 1;
-
-        return (
-          <td key={dateStr}
-            className={`px-0.5 py-1.5 align-top
-              ${isMon ? "border-l-2 border-l-border/40" : "border-l border-border/10"}
-              ${wknd ? "bg-white/[0.012]" : ""}
-              ${tod  ? "bg-primary/[0.07]" : ""}`}>
-            {timedEvs.length > 0 ? (
-              <div className="px-0.5">
-                {/* Scale ticks */}
-                <div className="flex justify-between px-px mb-0.5">
-                  <span className="text-[6px] text-white/20 leading-none">6</span>
-                  <span className="text-[6px] text-white/20 leading-none">22</span>
-                </div>
-                {/* Timeline bar — entity-colored blocks */}
-                <div className="w-full h-[8px] rounded-sm bg-black/25 relative overflow-hidden mb-1">
-                  {timedEvs.map(ev => {
-                    const ent  = entities.find(e => e.id === ev.entityId);
-                    const left = workPct(ev.startTime!);
-                    const w    = Math.max(3, workPct(ev.endTime!) - left);
-                    return (
-                      <div key={ev.id}
-                        title={`${ent?.name ?? "?"}: ${ev.startTime}–${ev.endTime}`}
-                        className="absolute top-0 bottom-0 cursor-help transition-opacity hover:opacity-80"
-                        style={{ left: `${left}%`, width: `${w}%`, backgroundColor: ent?.color ?? STATUS_COLORS[ev.status] }}/>
-                    );
-                  })}
-                </div>
-                {/* Free / busy label */}
-                <p className={`text-[7px] leading-none text-center font-medium ${
-                  freeWorkMins === 0 ? "text-rose-400/80" : "text-white/30"
-                }`}>
-                  {freeWorkMins > 0
-                    ? `${Math.floor(freeWorkMins / 60)}ч${freeWorkMins % 60 > 0 ? `${freeWorkMins % 60}м` : ""} св.`
-                    : "занято"}
-                </p>
-              </div>
-            ) : null}
-          </td>
-        );
-      })}
-
-      {/* ∑ column */}
-      <td className="border-l border-border/30"/>
-    </tr>
-  );
-}
-
 /* ─────────────────────── EntityRow ─────────────────────── */
 interface EntityRowProps {
   entity: Entity;
@@ -746,6 +735,7 @@ interface EntityRowProps {
   onEventClick: (ev: PlannerEvent, rect: DOMRect) => void;
   onContextMenu: (e: MouseEvent, ev: PlannerEvent) => void;
   onShiftClick: (ev: PlannerEvent) => void;
+  onDoneToggle: (ev: PlannerEvent) => void;
   onDragStart: (evId: string, srcEId: string, srcDate: string) => void;
   onDragEnd: () => void;
   onDragOver: (key: string, e: React.DragEvent) => void;
@@ -756,7 +746,7 @@ interface EntityRowProps {
 
 function EntityRow({
   entity, days, eventCount, dragOverKey,
-  getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick,
+  getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick, onDoneToggle,
   onDragStart, onDragEnd, onDragOver, onDrop,
   onDeleteEntity, onRenameEntity,
 }: EntityRowProps) {
@@ -816,7 +806,6 @@ function EntityRow({
         const wknd = isWeekend(day), tod = isToday(day);
         const key = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
-
         const isMon = day.getDay() === 1;
         return (
           <td key={dateStr}
@@ -836,6 +825,7 @@ function EntityRow({
               onEventClick={onEventClick}
               onContextMenu={onContextMenu}
               onShiftClick={onShiftClick}
+              onDoneToggle={onDoneToggle}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
             />
@@ -851,19 +841,20 @@ function EntityRow({
           : <span className="text-[10px] text-muted-foreground/30">—</span>
         }
       </td>
-
     </tr>
   );
 }
 
 /* ─────────────────────── HorizontalTimeline ─────────────────────── */
 function HorizontalTimeline({
-  date, entities, getEventsForCell, onDayReset,
+  date, entities, getEventsForCell, onDayReset, collapsed, onToggleCollapse,
 }: {
   date: string;
   entities: Entity[];
   getEventsForCell: (entityId: string, date: string) => PlannerEvent[];
   onDayReset: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 }) {
   const now      = new Date();
   const todayStr = format(now, "yyyy-MM-dd");
@@ -885,7 +876,6 @@ function HorizontalTimeline({
     } catch { return 0; }
   }
 
-  /* total busy minutes per entity */
   function busyMins(entity: Entity) {
     return getEventsForCell(entity.id, date)
       .filter(ev => ev.startTime && ev.endTime)
@@ -896,14 +886,13 @@ function HorizontalTimeline({
       }, 0);
   }
 
-  const LABEL_W = 160; // px for entity name column
+  const LABEL_W = 160;
 
   return (
-    <div className="border-t-2 border-border bg-card flex-shrink-0 px-4 pt-3 pb-2 select-none">
-      {/* ── Header row: label + 24-h axis ── */}
-      <div className="flex items-center mb-2" style={{ gap: 0 }}>
-        {/* Date label */}
-        <div className="flex items-center gap-2 flex-shrink-0" style={{ width: LABEL_W }}>
+    <div className="border-t-2 border-border bg-card flex-shrink-0 select-none">
+      {/* ── Collapse toggle bar ── */}
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/40">
+        <div className="flex items-center gap-2">
           <CalendarDays className="w-3.5 h-3.5 text-primary/60 flex-shrink-0"/>
           <button
             onClick={onDayReset}
@@ -913,348 +902,151 @@ function HorizontalTimeline({
             {dateLabel}
           </button>
         </div>
-
-        {/* Hour markers 0–24 */}
-        <div className="flex-1 relative h-6">
-          {Array.from({ length: 25 }, (_, h) => {
-            const isEven  = h % 2 === 0;
-            const isMajor = h % 6 === 0;
-            const isMid   = h % 2 === 0 && !isMajor;
-            return (
-              <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
-                style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
-                <span
-                  className={`font-mono leading-none ${isMajor ? "text-muted-foreground/80 text-[9px]" : "text-muted-foreground/45 text-[7px]"}`}
-                  style={{ marginTop: isEven ? 0 : 9 }}>
-                  {h < 24 ? h : ""}
-                </span>
-                <div className={`w-px mt-0.5 ${isMajor ? "h-2.5 bg-border/60" : isMid ? "h-1.5 bg-border/35" : "h-1 bg-border/20"}`}/>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Entity rows ── */}
-      {entities.map(entity => {
-        const evs        = getEventsForCell(entity.id, date);
-        const timedEvs   = evs.filter(ev => ev.startTime && ev.endTime);
-        const untimedEvs = evs.filter(ev => !ev.startTime);
-        const busy       = busyMins(entity);
-        const busyLabel  = busy > 0
-          ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""} занято`
-          : null;
-        const freeLabel  = busy > 0
-          ? `${Math.floor((960 - Math.min(busy, 960)) / 60)}ч св.`
-          : "свободен";
-
-        return (
-          <div key={entity.id} className="flex items-center mb-2" style={{ gap: 0 }}>
-            {/* Entity name */}
-            <div className="flex items-center gap-2 flex-shrink-0 pr-3" style={{ width: LABEL_W }}>
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
-              <span className="text-[11px] font-medium text-foreground/80 truncate leading-none">{entity.name}</span>
-              <div className="ml-auto flex-shrink-0 text-right">
-                {busyLabel ? (
-                  <span className="text-[9px] font-semibold block" style={{ color: entity.color }}>{busyLabel}</span>
-                ) : (
-                  <span className="text-[9px] text-muted-foreground/40 block">{freeLabel}</span>
-                )}
-                {untimedEvs.length > 0 && (
-                  <span className="text-[8px] text-muted-foreground/40 block">+{untimedEvs.length} без вр.</span>
-                )}
-              </div>
-            </div>
-
-            {/* Timeline track */}
-            <div className="flex-1 relative h-8 rounded-md overflow-hidden"
-              style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
-
-              {/* Hour grid lines */}
-              {Array.from({ length: 23 }, (_, i) => i + 1).map(h => (
-                <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
-                  style={{
-                    left: `${(h / 24) * 100}%`,
-                    backgroundColor: h % 6 === 0
-                      ? "rgba(255,255,255,0.12)"
-                      : h % 3 === 0
-                        ? "rgba(255,255,255,0.07)"
-                        : "rgba(255,255,255,0.03)"
-                  }}/>
-              ))}
-
-              {/* ── Free-time gaps (6:00–22:00 work window) ── */}
-              {(() => {
-                const WORK_S = 6 * 60, WORK_E = 22 * 60;
-                const sorted = [...timedEvs].sort((a, b) => timeToMins(a.startTime!) - timeToMins(b.startTime!));
-                const gaps: { s: number; e: number }[] = [];
-                let cur = WORK_S;
-                for (const ev of sorted) {
-                  const es = timeToMins(ev.startTime!), ee = timeToMins(ev.endTime!);
-                  if (es > cur) gaps.push({ s: cur, e: es });
-                  cur = Math.max(cur, ee);
-                }
-                if (cur < WORK_E) gaps.push({ s: cur, e: WORK_E });
-                return gaps.map((g, i) => {
-                  const l = (g.s / 1440) * 100, w = ((g.e - g.s) / 1440) * 100;
-                  const mins = g.e - g.s;
-                  const label = mins >= 60
-                    ? `${Math.floor(mins / 60)}ч${mins % 60 > 0 ? `\u00a0${mins % 60}м` : ""}`
-                    : `${mins}м`;
-                  return (
-                    <div key={i} className="absolute top-0 bottom-0 flex items-center justify-center overflow-hidden"
-                      style={{ left: `${l}%`, width: `${w}%`, background: "rgba(74,222,128,0.08)" }}>
-                      <div className="absolute inset-x-0 top-1/2 h-px bg-emerald-400/20"/>
-                      {w > 2.5 && (
-                        <span className="relative z-10 text-[8px] font-semibold text-emerald-400/55 px-0.5 leading-none select-none">
-                          {label}
-                        </span>
-                      )}
-                    </div>
-                  );
-                });
-              })()}
-
-              {/* ── Event bars with inline text ── */}
-              {timedEvs.map(ev => {
-                const l   = pct(ev.startTime!);
-                const w   = Math.max(pct(ev.endTime!) - l, 0.4);
-                const dur = calcDuration(ev.startTime!, ev.endTime!);
-                return (
-                  <div key={ev.id}
-                    className="absolute top-0.5 bottom-0.5 rounded-sm overflow-hidden flex flex-col justify-center px-1.5 cursor-default"
-                    style={{ left: `${l}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status] }}>
-                    {w > 3.5 && (
-                      <span className="text-white text-[10px] font-bold leading-tight truncate drop-shadow-sm">
-                        {ev.title}
-                      </span>
-                    )}
-                    {w > 2 && (
-                      <span className="text-white/80 text-[9px] font-mono leading-none truncate">
-                        {fmtTime(ev.startTime!)}–{fmtTime(ev.endTime!)}
-                        {w > 5 && ` · ${dur}`}
-                      </span>
-                    )}
-                    {ev.icon && ev.icon !== "none" && w <= 2 && (
-                      <span className="absolute left-0.5 top-1/2 -translate-y-1/2">
-                        <EventIconBadge icon={ev.icon} size={10}/>
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Current-time needle */}
-              {nowPct !== null && (
-                <div className="absolute top-0 bottom-0 w-0.5 rounded-full bg-red-400 z-10 pointer-events-none"
-                  style={{ left: `${nowPct}%` }}>
-                  <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-400"/>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ─────────────────────── DayTimelinePanel ─────────────────────── */
-const HOUR_H = 52; // px per hour → 24 * 52 = 1248px total
-
-function DayTimelinePanel({
-  date, entities, getEventsForCell, onClose,
-}: {
-  date: string;
-  entities: Entity[];
-  getEventsForCell: (entityId: string, date: string) => PlannerEvent[];
-  onClose: () => void;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const dateLabel = (() => {
-    try { return format(parseISO(date), "EEEE, d MMMM yyyy", { locale: ru }); } catch { return date; }
-  })();
-
-  /* auto-scroll to 7 am on open */
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 7 * HOUR_H - 20;
-  }, [date]);
-
-  /* current-time line */
-  const now = new Date();
-  const todayStr = format(now, "yyyy-MM-dd");
-  const isToday = date === todayStr;
-  const nowY = isToday ? (now.getHours() * 60 + now.getMinutes()) / 60 * HOUR_H : null;
-
-  function timeToY(t: string) {
-    const [h, m] = t.split(":").map(Number);
-    return (h * 60 + m) / 60 * HOUR_H;
-  }
-  function durY(s: string, e: string) {
-    const [sh, sm] = s.split(":").map(Number);
-    const [eh, em] = e.split(":").map(Number);
-    return Math.max(((eh * 60 + em) - (sh * 60 + sm)) / 60 * HOUR_H, 14);
-  }
-
-  /* busy minutes per entity */
-  function busyMins(entity: Entity) {
-    return getEventsForCell(entity.id, date)
-      .filter(ev => ev.startTime && ev.endTime)
-      .reduce((acc, ev) => {
-        const [sh, sm] = ev.startTime!.split(":").map(Number);
-        const [eh, em] = ev.endTime!.split(":").map(Number);
-        return acc + (eh * 60 + em) - (sh * 60 + sm);
-      }, 0);
-  }
-
-  const hours = Array.from({ length: 25 }, (_, i) => i);
-  const hasAnyTimedEvent = entities.some(e =>
-    getEventsForCell(e.id, date).some(ev => ev.startTime && ev.endTime)
-  );
-
-  return (
-    <div className="fixed inset-y-0 right-0 flex flex-col bg-card border-l border-border shadow-2xl z-40"
-      style={{ width: Math.min(460, 56 + entities.length * 80) }}>
-
-      {/* Header */}
-      <div className="flex items-start justify-between px-4 pt-3 pb-2.5 border-b border-border flex-shrink-0">
-        <div>
-          <p className="text-sm font-semibold capitalize leading-tight">{dateLabel}</p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            {hasAnyTimedEvent
-              ? `Кликните событие для деталей · ${entities.filter(e => busyMins(e) > 0).length} объект(ов) заняты`
-              : "Нет событий с временем — добавьте время в событие"
-            }
-          </p>
-        </div>
-        <button onClick={onClose}
-          className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0 ml-2">
-          <X className="w-3.5 h-3.5"/>
+        <button
+          onClick={onToggleCollapse}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-accent">
+          {collapsed ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>}
+          {collapsed ? "Развернуть" : "Свернуть"}
         </button>
       </div>
 
-      {/* Entity column headers */}
-      <div className="flex flex-shrink-0 border-b border-border" style={{ paddingLeft: 56 }}>
-        {entities.map(entity => {
-          const busy = busyMins(entity);
-          const freeH = 24 - busy / 60;
-          return (
-            <div key={entity.id} className="flex-1 px-1.5 py-2 border-r border-border/40 last:border-r-0 min-w-0">
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
-                <span className="text-[9px] font-semibold text-foreground truncate">{entity.name}</span>
-              </div>
-              {busy > 0 ? (
-                <p className="text-[8px] text-muted-foreground leading-tight">
-                  <span className="text-foreground font-medium">{Math.floor(busy/60)}ч{busy%60>0?` ${busy%60}м`:""}</span>
-                  {" "}занято · {Math.floor(freeH)}ч свободно
-                </p>
-              ) : (
-                <p className="text-[8px] text-muted-foreground/50">Свободен</p>
-              )}
+      {!collapsed && (
+        <div className="px-4 pt-2 pb-2">
+          {/* ── Header row: 24-h axis ── */}
+          <div className="flex items-center mb-2" style={{ gap: 0 }}>
+            <div className="flex-shrink-0" style={{ width: LABEL_W }}/>
+            <div className="flex-1 relative h-6">
+              {Array.from({ length: 25 }, (_, h) => {
+                const isEven  = h % 2 === 0;
+                const isMajor = h % 6 === 0;
+                const isMid   = h % 2 === 0 && !isMajor;
+                return (
+                  <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
+                    style={{ left: `${(h / 24) * 100}%`, top: 0 }}>
+                    <span
+                      className={`font-mono leading-none ${isMajor ? "text-muted-foreground/80 text-[9px]" : "text-muted-foreground/45 text-[7px]"}`}
+                      style={{ marginTop: isEven ? 0 : 9 }}>
+                      {h < 24 ? h : ""}
+                    </span>
+                    <div className={`w-px mt-0.5 ${isMajor ? "h-2.5 bg-border/60" : isMid ? "h-1.5 bg-border/35" : "h-1 bg-border/20"}`}/>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
-
-      {/* Scrollable timeline */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="flex" style={{ height: 24 * HOUR_H }}>
-
-          {/* Hour labels column */}
-          <div className="flex-shrink-0 relative" style={{ width: 56 }}>
-            {hours.map(h => (
-              <div key={h} className="absolute left-0 right-0 flex items-start justify-end pr-2"
-                style={{ top: h * HOUR_H, height: HOUR_H }}>
-                <span className="text-[9px] text-muted-foreground/50 font-mono leading-none pt-0.5">
-                  {h < 24 ? `${String(h).padStart(2,"0")}:00` : ""}
-                </span>
-              </div>
-            ))}
-            {/* Current time label */}
-            {nowY !== null && (
-              <div className="absolute right-1 flex items-center" style={{ top: nowY - 6 }}>
-                <span className="text-[8px] text-red-400 font-mono font-bold">
-                  {String(now.getHours()).padStart(2,"0")}:{String(now.getMinutes()).padStart(2,"0")}
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* Entity lanes */}
-          {entities.map(entity => {
-            const evs = getEventsForCell(entity.id, date);
-            const timedEvs  = evs.filter(ev => ev.startTime && ev.endTime);
-            const untimedEvs = evs.filter(ev => !ev.startTime);
+          {/* ── Entity rows ── */}
+          <div className="overflow-y-auto" style={{ maxHeight: 180 }}>
+            {entities.map(entity => {
+              const evs        = getEventsForCell(entity.id, date);
+              const timedEvs   = evs.filter(ev => ev.startTime && ev.endTime);
+              const untimedEvs = evs.filter(ev => !ev.startTime);
+              const busy       = busyMins(entity);
+              const busyLabel  = busy > 0
+                ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""} занято`
+                : null;
+              const freeLabel  = busy > 0
+                ? `${Math.floor((960 - Math.min(busy, 960)) / 60)}ч св.`
+                : "свободен";
 
-            return (
-              <div key={entity.id} className="flex-1 relative border-r border-border/30 last:border-r-0 min-w-0">
-                {/* Hour grid lines */}
-                {hours.map(h => (
-                  <div key={h} className="absolute left-0 right-0 border-t pointer-events-none"
-                    style={{ top: h * HOUR_H, borderColor: h % 6 === 0 ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)" }}/>
-                ))}
-                {/* Half-hour lines */}
-                {hours.slice(0, 24).map(h => (
-                  <div key={`h${h}`} className="absolute left-0 right-0 border-t border-dashed pointer-events-none"
-                    style={{ top: h * HOUR_H + HOUR_H / 2, borderColor: "rgba(255,255,255,0.03)" }}/>
-                ))}
-
-                {/* Current time indicator */}
-                {nowY !== null && (
-                  <div className="absolute left-0 right-0 h-px bg-red-400/70 z-20 pointer-events-none"
-                    style={{ top: nowY }}/>
-                )}
-
-                {/* Free time highlight (subtle) */}
-                <div className="absolute inset-0 pointer-events-none"
-                  style={{ background: "linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.01) 100%)" }}/>
-
-                {/* Timed event blocks */}
-                {timedEvs.map(ev => {
-                  const top    = timeToY(ev.startTime!);
-                  const height = durY(ev.startTime!, ev.endTime!);
-                  const color  = STATUS_COLORS[ev.status];
-                  const dur    = calcDuration(ev.startTime!, ev.endTime!);
-                  return (
-                    <div key={ev.id}
-                      className="absolute left-1 right-1 rounded-md overflow-hidden cursor-pointer group/block
-                        hover:brightness-110 hover:z-10 transition-all"
-                      style={{ top: top + 1, height: height - 2, backgroundColor: color, zIndex: 5 }}>
-                      <div className="h-full flex flex-col px-1.5 py-1 overflow-hidden">
-                        <p className="text-[9px] font-bold text-white leading-tight truncate flex-shrink-0">
-                          {ev.title}
-                        </p>
-                        {height >= 30 && (
-                          <p className="text-[8px] text-white/80 leading-none mt-0.5 flex-shrink-0">
-                            {ev.startTime} – {ev.endTime}
-                          </p>
-                        )}
-                        {height >= 44 && (
-                          <p className="text-[8px] text-white/60 leading-none mt-0.5 flex-shrink-0">{dur}</p>
-                        )}
-                      </div>
+              return (
+                <div key={entity.id} className="flex items-center mb-2" style={{ gap: 0 }}>
+                  <div className="flex items-center gap-2 flex-shrink-0 pr-3" style={{ width: LABEL_W }}>
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
+                    <span className="text-[11px] font-medium text-foreground/80 truncate leading-none">{entity.name}</span>
+                    <div className="ml-auto flex-shrink-0 text-right">
+                      {busyLabel ? (
+                        <span className="text-[9px] font-semibold block" style={{ color: entity.color }}>{busyLabel}</span>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground/40 block">{freeLabel}</span>
+                      )}
+                      {untimedEvs.length > 0 && (
+                        <span className="text-[8px] text-muted-foreground/40 block">+{untimedEvs.length} без вр.</span>
+                      )}
                     </div>
-                  );
-                })}
-
-                {/* Untimed events — top strip */}
-                {untimedEvs.length > 0 && (
-                  <div className="absolute top-1 left-1 right-1 flex flex-col gap-0.5 z-10">
-                    {untimedEvs.map(ev => (
-                      <div key={ev.id} className="rounded px-1 py-0.5 opacity-70"
-                        style={{ backgroundColor: STATUS_COLORS[ev.status] }}>
-                        <p className="text-[8px] text-white font-medium leading-none truncate">{ev.title}</p>
-                      </div>
-                    ))}
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  <div className="flex-1 relative h-8 rounded-md overflow-hidden"
+                    style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
+                    {Array.from({ length: 23 }, (_, i) => i + 1).map(h => (
+                      <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
+                        style={{
+                          left: `${(h / 24) * 100}%`,
+                          backgroundColor: h % 6 === 0
+                            ? "rgba(255,255,255,0.12)"
+                            : h % 3 === 0
+                              ? "rgba(255,255,255,0.07)"
+                              : "rgba(255,255,255,0.03)"
+                        }}/>
+                    ))}
+
+                    {(() => {
+                      const WORK_S = 6 * 60, WORK_E = 22 * 60;
+                      const sorted = [...timedEvs].sort((a, b) => timeToMins(a.startTime!) - timeToMins(b.startTime!));
+                      const gaps: { s: number; e: number }[] = [];
+                      let cur = WORK_S;
+                      for (const ev of sorted) {
+                        const es = timeToMins(ev.startTime!), ee = timeToMins(ev.endTime!);
+                        if (es > cur) gaps.push({ s: cur, e: es });
+                        cur = Math.max(cur, ee);
+                      }
+                      if (cur < WORK_E) gaps.push({ s: cur, e: WORK_E });
+                      return gaps.map((g, i) => {
+                        const l = (g.s / 1440) * 100, w = ((g.e - g.s) / 1440) * 100;
+                        const mins = g.e - g.s;
+                        const label = mins >= 60
+                          ? `${Math.floor(mins / 60)}ч${mins % 60 > 0 ? `\u00a0${mins % 60}м` : ""}`
+                          : `${mins}м`;
+                        return (
+                          <div key={i} className="absolute top-0 bottom-0 flex items-center justify-center overflow-hidden"
+                            style={{ left: `${l}%`, width: `${w}%`, background: "rgba(74,222,128,0.08)" }}>
+                            <div className="absolute inset-x-0 top-1/2 h-px bg-emerald-400/20"/>
+                            {w > 2.5 && (
+                              <span className="relative z-10 text-[8px] font-semibold text-emerald-400/55 px-0.5 leading-none select-none">
+                                {label}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
+
+                    {timedEvs.map(ev => {
+                      const l   = pct(ev.startTime!);
+                      const w   = Math.max(pct(ev.endTime!) - l, 0.4);
+                      const dur = calcDuration(ev.startTime!, ev.endTime!);
+                      return (
+                        <div key={ev.id}
+                          className="absolute top-0.5 bottom-0.5 rounded-sm overflow-hidden flex flex-col justify-center px-1.5 cursor-default"
+                          style={{ left: `${l}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.5 : 1 }}>
+                          {w > 3.5 && (
+                            <span className="text-white text-[10px] font-bold leading-tight truncate drop-shadow-sm">
+                              {ev.title}
+                            </span>
+                          )}
+                          {w > 2 && (
+                            <span className="text-white/80 text-[9px] font-mono leading-none truncate">
+                              {fmtTime(ev.startTime!)}–{fmtTime(ev.endTime!)}
+                              {w > 5 && ` · ${dur}`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {nowPct !== null && (
+                      <div className="absolute top-0 bottom-0 w-0.5 rounded-full bg-red-400 z-10 pointer-events-none"
+                        style={{ left: `${nowPct}%` }}>
+                        <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-400"/>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1268,33 +1060,31 @@ interface GridCellProps {
   onEventClick: (ev: PlannerEvent, rect: DOMRect) => void;
   onContextMenu: (e: MouseEvent, ev: PlannerEvent) => void;
   onShiftClick: (ev: PlannerEvent) => void;
+  onDoneToggle: (ev: PlannerEvent) => void;
   onDragStart: (evId: string, srcEId: string, srcDate: string) => void;
   onDragEnd: () => void;
 }
 
-/** Duration in minutes → span factor (0..1) within an 8-hour workday */
 function durSpan(start: string, end: string): number {
   const mins = calcDurationMins(start, end);
-  return Math.min(1, Math.max(0.12, mins / 480)); // 480 = 8h workday
+  return Math.min(1, Math.max(0.12, mins / 480));
 }
 
 function GridCell({
   events, entityId, date,
-  onAddClick, onEventClick, onContextMenu, onShiftClick,
+  onAddClick, onEventClick, onContextMenu, onShiftClick, onDoneToggle,
   onDragStart, onDragEnd,
 }: GridCellProps) {
-  const ref      = useRef<HTMLDivElement>(null);
-  const [hovering, setHovering] = useState(false);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tipId    = `${entityId}__${date}`;
+  const ref = useRef<HTMLDivElement>(null);
+  const [hoverCard, setHoverCard] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showTip = () => {
-    tooltipOwnerId = tipId;
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    setHovering(true);
+  const showCard = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoverCard(true);
   };
-  const hideTip = () => {
-    hideTimer.current = setTimeout(() => setHovering(false), 60);
+  const hideCard = () => {
+    hoverTimer.current = setTimeout(() => setHoverCard(false), 80);
   };
 
   /* ── Empty cell ── */
@@ -1312,7 +1102,7 @@ function GridCell({
   if (events.length > 1) {
     const timedEvs = events.filter(e => e.startTime && e.endTime);
     const totalBusy = timedEvs.reduce((s, e) => s + calcDurationMins(e.startTime!, e.endTime!), 0);
-    const freeWorkMins = Math.max(0, 960 - totalBusy); // 16h window 6–22
+    const freeWorkMins = Math.max(0, 960 - totalBusy);
     const freeLabel = freeWorkMins > 0
       ? (freeWorkMins >= 60
           ? `${Math.floor(freeWorkMins / 60)}ч${freeWorkMins % 60 > 0 ? ` ${freeWorkMins % 60}м` : ""}`
@@ -1323,20 +1113,17 @@ function GridCell({
       <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
         className="relative w-full min-h-[48px] rounded-md overflow-hidden border border-white/10
           bg-white/[0.05] p-1 flex flex-col gap-0.5">
-
-        {/* Mini timeline 6:00–22:00 */}
         <div className="w-full h-[5px] rounded-full bg-black/30 relative overflow-hidden flex-shrink-0">
           {timedEvs.map(ev => {
             const left = workPct(ev.startTime!);
             const w    = Math.max(3, workPct(ev.endTime!) - left);
             return (
               <div key={ev.id} className="absolute top-0 bottom-0 rounded-sm"
-                style={{ left: `${left}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status] }}/>
+                style={{ left: `${left}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.4 : 1 }}/>
             );
           })}
         </div>
 
-        {/* Event list — each clickable */}
         <div className="flex flex-col gap-px flex-1 min-h-0">
           {events.slice(0, 3).map(ev => (
             <button key={ev.id}
@@ -1345,14 +1132,10 @@ function GridCell({
               className="flex items-center gap-1 w-full text-left hover:bg-white/10 rounded px-0.5 py-px transition-colors group/chip">
               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: STATUS_COLORS[ev.status] }}/>
-              <span className="text-[7px] text-white/75 truncate leading-none font-medium">
+              <span className={`text-[7px] text-white/75 truncate leading-none font-medium ${ev.done ? "line-through opacity-50" : ""}`}>
                 {ev.startTime ? `${fmtTime(ev.startTime)}` : ev.title.slice(0, 8)}
               </span>
-              {ev.endTime && (
-                <span className="text-[6px] text-white/40 leading-none ml-auto flex-shrink-0 hidden group-hover/chip:block">
-                  –{fmtTime(ev.endTime)}
-                </span>
-              )}
+              {ev.done && <BadgeCheck className="w-2.5 h-2.5 text-emerald-400 flex-shrink-0 ml-auto"/>}
             </button>
           ))}
           {events.length > 3 && (
@@ -1360,7 +1143,6 @@ function GridCell({
           )}
         </div>
 
-        {/* Footer: free time + add button */}
         <div className="flex items-center justify-between mt-auto flex-shrink-0">
           <span className={`text-[6.5px] leading-none font-medium ${freeWorkMins > 0 ? "text-white/35" : "text-rose-400/70"}`}>
             {freeLabel}
@@ -1376,16 +1158,15 @@ function GridCell({
   }
 
   /* ── Single event card ── */
-  const first   = events[0];
-  const hasTime = !!(first.startTime && first.endTime);
-  const dur     = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
-  const color   = STATUS_COLORS[first.status];
+  const first    = events[0];
+  const hasTime  = !!(first.startTime && first.endTime);
+  const dur      = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
+  const color    = STATUS_COLORS[first.status];
   const gradient = STATUS_GRADIENTS[first.status];
-  const earn    = first.earnings ?? 0;
+  const earn     = first.earnings ?? 0;
+  const exp      = first.expenses ?? 0;
 
-  /* Duration-based fill: how much of the cell this event visually "fills" */
-  const span   = hasTime ? durSpan(first.startTime!, first.endTime!) : 0.4;
-  /* Start position (0–22h mapped to 0–100%) */
+  const span      = hasTime ? durSpan(first.startTime!, first.endTime!) : 0.4;
   const startFrac = hasTime ? Math.max(0, Math.min(1, (calcDurationMins("06:00", first.startTime!) / 960))) : 0;
 
   return (
@@ -1394,9 +1175,9 @@ function GridCell({
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
         draggable
-        onMouseEnter={showTip}
-        onMouseLeave={hideTip}
-        onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHovering(false); }}
+        onMouseEnter={showCard}
+        onMouseLeave={hideCard}
+        onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHoverCard(false); }}
         onDragEnd={onDragEnd}
         onClick={e => {
           if (e.shiftKey) { onShiftClick(first); return; }
@@ -1405,18 +1186,39 @@ function GridCell({
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
         className="relative w-full min-h-[48px] cursor-grab active:cursor-grabbing group/ev rounded-md overflow-hidden
           transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg select-none"
-        style={{ background: gradient }}>
+        style={{ background: gradient, opacity: first.done ? 0.65 : 1 }}>
+
+        {/* Done overlay */}
+        {first.done && (
+          <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10 pointer-events-none rounded-md">
+            <div className="flex items-center gap-1 bg-emerald-500/80 rounded-full px-1.5 py-0.5">
+              <Check className="w-2.5 h-2.5 text-white"/>
+              <span className="text-[8px] text-white font-bold">Готово</span>
+            </div>
+          </div>
+        )}
 
         {/* Icon */}
-        {first.icon && first.icon !== "none" && (
+        {first.icon && first.icon !== "none" && !first.done && (
           <span className="absolute top-1.5 left-1.5 opacity-80">
             <EventIconBadge icon={first.icon} size={10}/>
           </span>
         )}
 
+        {/* Done toggle button — appears on hover */}
+        <button
+          onClick={e => { e.stopPropagation(); onDoneToggle(first); }}
+          title={first.done ? "Снять отметку" : "Отметить выполненным"}
+          className="absolute top-1 right-1 w-4 h-4 rounded-full opacity-0 group-hover/ev:opacity-100
+            transition-all flex items-center justify-center z-20
+            bg-black/30 hover:bg-emerald-500/80"
+          style={{ pointerEvents: "all" }}>
+          <Check className="w-2.5 h-2.5 text-white"/>
+        </button>
+
         {/* Content */}
-        <div className="px-1.5 pt-1.5 pb-1 flex flex-col justify-between h-full min-h-[48px]">
-          <p className="text-white text-[9px] font-semibold leading-tight line-clamp-2 drop-shadow-sm">
+        <div className={`px-1.5 pt-1.5 pb-1 flex flex-col justify-between h-full min-h-[48px] ${first.done ? "opacity-60" : ""}`}>
+          <p className={`text-white text-[9px] font-semibold leading-tight line-clamp-2 drop-shadow-sm ${first.done ? "line-through" : ""}`}>
             {first.title}
           </p>
           <div className="mt-auto">
@@ -1425,7 +1227,6 @@ function GridCell({
                 {fmtTime(first.startTime!)}–{fmtTime(first.endTime!)}
               </p>
             )}
-            {/* Duration bar */}
             <div className="w-full h-[3px] rounded-full bg-black/20 overflow-hidden">
               <div className="h-full rounded-full bg-white/50 transition-all"
                 style={{ width: `${span * 100}%`, marginLeft: `${startFrac * (1 - span) * 100}%` }}/>
@@ -1433,6 +1234,7 @@ function GridCell({
             {earn > 0 ? (
               <p className="text-white/80 text-[8px] font-bold leading-none mt-1 tabular-nums">
                 {earn >= 1000 ? `${Math.round(earn / 100) / 10}к ₽` : `${earn} ₽`}
+                {exp > 0 && <span className="text-rose-300/80 ml-1">-{exp >= 1000 ? `${Math.round(exp / 100) / 10}к` : exp}</span>}
               </p>
             ) : dur ? (
               <p className="text-white/60 text-[8px] leading-none mt-1">{dur}</p>
@@ -1442,41 +1244,51 @@ function GridCell({
         <div className="absolute inset-0 opacity-0 group-hover/ev:opacity-100 bg-black/10 transition-opacity pointer-events-none rounded-md"/>
       </div>
 
-      {hovering && tooltipOwnerId === tipId && (
-        <TimeTooltip event={first} dur={dur} anchorEl={ref.current} onEnter={showTip} onLeave={hideTip}/>
+      {/* ── Hover Info Card ── */}
+      {hoverCard && (
+        <EventInfoCard
+          event={first}
+          dur={dur}
+          anchorEl={ref.current}
+          onEnter={showCard}
+          onLeave={hideCard}
+          onDoneToggle={onDoneToggle}
+        />
       )}
     </>
   );
 }
 
-/* ─────────────────────── TimeTooltip ─────────────────────── */
-interface TimeTooltipProps {
+/* ─────────────────────── EventInfoCard (replaces tooltip) ─────────────────────── */
+function EventInfoCard({
+  event, dur, anchorEl, onEnter, onLeave, onDoneToggle,
+}: {
   event: PlannerEvent;
   dur: string;
   anchorEl: HTMLElement | null;
   onEnter: () => void;
   onLeave: () => void;
-}
-
-function TimeTooltip({ event, dur, anchorEl, onEnter, onLeave }: TimeTooltipProps) {
-  const hasTime = !!(event.startTime && event.endTime);
+  onDoneToggle: (ev: PlannerEvent) => void;
+}) {
   const color   = STATUS_COLORS[event.status];
+  const hasTime = !!(event.startTime && event.endTime);
+  const earn    = event.earnings ?? 0;
+  const exp     = event.expenses ?? 0;
+  const net     = earn - exp;
 
   const style = (() => {
     if (!anchorEl) return { display: "none" } as React.CSSProperties;
-    const r   = anchorEl.getBoundingClientRect();
-    const W   = 256, H = hasTime ? 116 : 72;
-    const vw  = window.innerWidth, vh = window.innerHeight;
-    let left  = r.left + r.width / 2 - W / 2;
-    let top   = r.bottom + 6;
-    if (left + W > vw - 8) left = vw - W - 8;
-    if (left < 8)          left = 8;
-    if (top  + H > vh - 8) top  = r.top - H - 6;
+    const r  = anchorEl.getBoundingClientRect();
+    const W  = 240;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = r.right + 8;
+    let top  = r.top;
+    if (left + W > vw - 8) left = r.left - W - 8;
+    if (left < 8) left = 8;
+    if (top + 200 > vh - 8) top = vh - 208;
+    if (top < 8) top = 8;
     return { position: "fixed" as const, left, top, width: W, zIndex: 9999 };
   })();
-
-  const startP = hasTime ? timePct(event.startTime!) : 0;
-  const endP   = hasTime ? timePct(event.endTime!)   : 0;
 
   return (
     <div style={style}
@@ -1484,56 +1296,106 @@ function TimeTooltip({ event, dur, anchorEl, onEnter, onLeave }: TimeTooltipProp
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}>
       {/* Status stripe */}
-      <div className="h-0.5" style={{ backgroundColor: color }}/>
+      <div className="h-1" style={{ backgroundColor: color }}/>
 
-      <div className="p-3">
+      <div className="p-3 space-y-2">
         {/* Title row */}
-        <div className="flex items-start gap-2 mb-2">
-          <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: color }}/>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-foreground leading-tight truncate">{event.title}</p>
-            <p className="text-[10px] text-muted-foreground">{event.assignee} · {STATUS_LABELS[event.status]}</p>
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              {event.icon && event.icon !== "none" && (
+                <span className="flex-shrink-0">
+                  <EventIconBadge icon={event.icon} size={12}/>
+                </span>
+              )}
+              <p className={`text-xs font-semibold text-foreground leading-tight ${event.done ? "line-through opacity-60" : ""}`}>
+                {event.title}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }}/>
+              <p className="text-[10px] text-muted-foreground">{STATUS_LABELS[event.status]}</p>
+              {event.done && (
+                <span className="flex items-center gap-0.5 text-[9px] font-bold text-emerald-400">
+                  <BadgeCheck className="w-3 h-3"/>Выполнено
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
+        {/* Assignee */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+            style={{ backgroundColor: color }}>
+            {event.assignee.split(" ").map(p => p[0]).join("").slice(0,2).toUpperCase() || "?"}
+          </div>
+          <span className="text-[11px] text-foreground/80">{event.assignee}</span>
+        </div>
+
+        {/* Time */}
         {hasTime && (
-          <>
-            {/* 24-hour timeline */}
-            <div className="mb-1">
-              <div className="relative h-4 bg-accent/40 rounded overflow-hidden">
-                {/* hour ticks */}
-                {[6, 12, 18].map(h => (
-                  <div key={h} className="absolute top-0 bottom-0 w-px bg-border/60"
-                    style={{ left: `${(h / 24) * 100}%` }}/>
-                ))}
-                {/* event block */}
-                <div className="absolute top-0.5 bottom-0.5 rounded"
-                  style={{ left: `${startP}%`, width: `${Math.max(endP - startP, 1.5)}%`, backgroundColor: color, opacity: 0.9 }}/>
-              </div>
-              {/* tick labels */}
-              <div className="flex justify-between text-[8px] text-muted-foreground/60 mt-0.5 px-0.5">
-                <span>0</span><span>6</span><span>12</span><span>18</span><span>24</span>
-              </div>
-            </div>
-
-            {/* Time + duration row */}
-            <div className="flex items-center justify-between pt-1 border-t border-border">
-              <span className="text-[11px] font-semibold text-foreground">
-                {event.startTime}
-                <span className="text-muted-foreground mx-1">→</span>
-                {event.endTime}
-              </span>
-              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-accent/40 border border-border/40">
+            <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0"/>
+            <span className="text-[11px] font-semibold text-foreground">
+              {event.startTime} → {event.endTime}
+            </span>
+            {dur && (
+              <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                 style={{ backgroundColor: `${color}25`, color }}>
-                <Clock className="w-2.5 h-2.5"/>{dur}
+                {dur}
               </span>
-            </div>
-          </>
+            )}
+          </div>
+        )}
+        {!hasTime && (
+          <p className="text-[10px] text-muted-foreground/50 italic">Время не указано</p>
         )}
 
-        {!hasTime && (
-          <p className="text-[10px] text-muted-foreground/60 italic">Время не указано</p>
+        {/* Notes */}
+        {event.notes && (
+          <p className="text-[10px] text-muted-foreground/70 leading-relaxed italic border-l-2 pl-2"
+            style={{ borderColor: `${color}60` }}>
+            {event.notes.slice(0, 80)}{event.notes.length > 80 ? "…" : ""}
+          </p>
         )}
+
+        {/* Earnings / Expenses */}
+        {(earn > 0 || exp > 0) && (
+          <div className="flex items-center gap-2 pt-1 border-t border-border/40">
+            {earn > 0 && (
+              <div className="flex items-center gap-1">
+                <ArrowUpRight className="w-3 h-3 text-emerald-400"/>
+                <span className="text-[11px] font-bold text-emerald-400 tabular-nums">{fmtMoney(earn)}</span>
+              </div>
+            )}
+            {exp > 0 && (
+              <div className="flex items-center gap-1">
+                <ArrowDownRight className="w-3 h-3 text-rose-400"/>
+                <span className="text-[11px] font-bold text-rose-400 tabular-nums">{fmtMoney(exp)}</span>
+              </div>
+            )}
+            {earn > 0 && exp > 0 && (
+              <div className="flex items-center gap-1 ml-auto">
+                <Minus className="w-2.5 h-2.5 text-muted-foreground/60"/>
+                <span className={`text-[11px] font-bold tabular-nums ${net >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {fmtMoney(net)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Done button */}
+        <button
+          onClick={() => onDoneToggle(event)}
+          className={`w-full flex items-center justify-center gap-1.5 text-[10px] font-semibold py-1.5 rounded-lg border transition-all
+            ${event.done
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+              : "border-border text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-400 hover:bg-emerald-500/10"}`}>
+          <BadgeCheck className="w-3 h-3"/>
+          {event.done ? "Снять выполнение" : "Отметить выполненным"}
+        </button>
       </div>
     </div>
   );
@@ -1550,9 +1412,7 @@ const QUICK_DURATIONS = [
   { label: "8 ч",  mins: 480 },
 ];
 
-function TimeSpinner({
-  value, onChange, label,
-}: { value: string; onChange: (v: string) => void; label: string }) {
+function TimeSpinner({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   const [h, m] = value ? value.split(":").map(Number) : [9, 0];
 
   const setH = (nh: number) => {
@@ -1568,7 +1428,6 @@ function TimeSpinner({
     <div className="flex flex-col items-center gap-1 flex-1">
       <span className="text-[9px] text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
       <div className="flex items-center gap-1 bg-accent/50 rounded-lg px-2 py-1.5 border border-border">
-        {/* Hours */}
         <div className="flex flex-col items-center gap-0.5">
           <button type="button" onClick={() => setH(h + 1)}
             className="w-5 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
@@ -1583,7 +1442,6 @@ function TimeSpinner({
           </button>
         </div>
         <span className="text-base font-bold text-muted-foreground/60 mb-0.5">:</span>
-        {/* Minutes */}
         <div className="flex flex-col items-center gap-0.5">
           <button type="button" onClick={() => setM(m + 15)}
             className="w-5 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors">
@@ -1602,21 +1460,16 @@ function TimeSpinner({
   );
 }
 
-interface TimePickerProps {
-  startTime: string;
-  endTime: string;
-  onStartChange: (v: string) => void;
-  onEndChange: (v: string) => void;
-}
-
-function TimePicker({ startTime, endTime, onStartChange, onEndChange }: TimePickerProps) {
+function TimePicker({ startTime, endTime, onStartChange, onEndChange }: {
+  startTime: string; endTime: string;
+  onStartChange: (v: string) => void; onEndChange: (v: string) => void;
+}) {
   const dur     = startTime && endTime ? calcDuration(startTime, endTime) : "";
   const durMins = startTime && endTime ? calcDurationMins(startTime, endTime) : 0;
   const span    = durMins > 0 ? Math.min(1, durMins / 480) : 0;
 
   return (
     <div className="space-y-2.5">
-      {/* Spinners row */}
       <div className="flex items-start gap-2">
         <TimeSpinner value={startTime} onChange={onStartChange} label="Начало"/>
         <div className="flex flex-col items-center pt-7 flex-shrink-0">
@@ -1626,7 +1479,6 @@ function TimePicker({ startTime, endTime, onStartChange, onEndChange }: TimePick
         <TimeSpinner value={endTime} onChange={onEndChange} label="Конец"/>
       </div>
 
-      {/* Quick duration presets */}
       <div>
         <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1.5">Быстрая длительность</p>
         <div className="flex flex-wrap gap-1">
@@ -1646,7 +1498,6 @@ function TimePicker({ startTime, endTime, onStartChange, onEndChange }: TimePick
         </div>
       </div>
 
-      {/* Visual bar preview */}
       {dur && (
         <div className="rounded-lg bg-accent/40 border border-border p-2">
           <div className="flex items-center justify-between mb-1.5">
@@ -1668,15 +1519,12 @@ function TimePicker({ startTime, endTime, onStartChange, onEndChange }: TimePick
 }
 
 /* ─────────────────────── AddEventPopup ─────────────────────── */
-interface AddEventPopupProps {
-  entityId: string;
-  date: string;
+function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: {
+  entityId: string; date: string;
   existingEvents: PlannerEvent[];
   onClose: () => void;
   onAdd: (ev: PlannerEvent) => void;
-}
-
-function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEventPopupProps) {
+}) {
   const [title,     setTitle]     = useState("");
   const [assignee,  setAssignee]  = useState("");
   const [status,    setStatus]    = useState<EventStatus>("pending");
@@ -1686,6 +1534,7 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
   const [useTime,   setUseTime]   = useState(false);
   const [icon,      setIcon]      = useState<EventIcon>("none");
   const [earnings,  setEarnings]  = useState<string>("");
+  const [expenses,  setExpenses]  = useState<string>("");
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -1693,7 +1542,6 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
     try { return format(parseISO(date), "d MMMM yyyy", { locale: ru }); } catch { return date; }
   })();
 
-  /* Conflict detection */
   const conflict = useTime && startTime && endTime
     ? existingEvents.find(e =>
         e.startTime && e.endTime &&
@@ -1714,6 +1562,7 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
       endTime:   useTime ? endTime   : undefined,
       icon:     icon !== "none" ? icon : undefined,
       earnings: earnings ? parseFloat(earnings) : undefined,
+      expenses: expenses ? parseFloat(expenses) : undefined,
     });
   };
 
@@ -1742,7 +1591,6 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
             placeholder="Ответственный"
             className="w-full text-sm bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
 
-          {/* Time toggle */}
           <div>
             <button
               data-testid="btn-toggle-time"
@@ -1756,10 +1604,8 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
             {useTime && (
               <div className="mt-2 space-y-2">
                 <TimePicker
-                  startTime={startTime}
-                  endTime={endTime}
-                  onStartChange={setStartTime}
-                  onEndChange={setEndTime}
+                  startTime={startTime} endTime={endTime}
+                  onStartChange={setStartTime} onEndChange={setEndTime}
                 />
                 {conflict && (
                   <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-destructive/10 border border-destructive/30">
@@ -1776,7 +1622,6 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
             )}
           </div>
 
-          {/* Status */}
           <div className="flex gap-1.5">
             {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
               <button key={s} data-testid={`btn-status-${s}`}
@@ -1796,14 +1641,24 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
 
           <IconPicker value={icon} onChange={setIcon}/>
 
-          {/* Earnings */}
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
-            <input
-              type="number" min="0" step="100"
-              value={earnings} onChange={e => setEarnings(e.target.value)}
-              placeholder="Заработок за смену"
-              className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-3 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+          {/* Earnings + Expenses row */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
+              <input
+                type="number" min="0" step="100"
+                value={earnings} onChange={e => setEarnings(e.target.value)}
+                placeholder="Заработок"
+                className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+            </div>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400 text-xs font-bold">−</span>
+              <input
+                type="number" min="0" step="100"
+                value={expenses} onChange={e => setExpenses(e.target.value)}
+                placeholder="Траты"
+                className="w-full text-xs bg-accent/40 border border-rose-500/20 rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-rose-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+            </div>
           </div>
         </div>
 
@@ -1818,16 +1673,15 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: AddEv
 }
 
 /* ─────────────────────── ViewPopup ─────────────────────── */
-interface ViewPopupProps {
+function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, onSave, onDuplicate }: {
   event: PlannerEvent;
   existingEvents: PlannerEvent[];
   onClose: () => void;
   onStatusChange: (s: EventStatus) => void;
   onDelete: () => void;
   onSave: (upd: PlannerEvent) => void;
-}
-
-function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, onSave, onDuplicate }: ViewPopupProps & { onDuplicate: (date: string) => void }) {
+  onDuplicate: (date: string) => void;
+}) {
   const [editTitle,    setEditTitle]    = useState(event.title);
   const [editAssignee, setEditAssignee] = useState(event.assignee);
   const [editNotes,    setEditNotes]    = useState(event.notes ?? "");
@@ -1835,6 +1689,7 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
   const [endTime,      setEndTime]      = useState(event.endTime ?? "");
   const [editIcon,     setEditIcon]     = useState<EventIcon>(event.icon ?? "none");
   const [editEarnings, setEditEarnings] = useState<string>(event.earnings != null ? String(event.earnings) : "");
+  const [editExpenses, setEditExpenses] = useState<string>(event.expenses != null ? String(event.expenses) : "");
   const [dupMode,      setDupMode]      = useState(false);
   const [dupDate,      setDupDate]      = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [dirty, setDirty] = useState(false);
@@ -1846,7 +1701,6 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
   const initials = event.assignee.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "?";
   const dur = startTime && endTime ? calcDuration(startTime, endTime) : "";
 
-  /* Conflict detection — exclude the event being edited */
   const conflict = startTime && endTime
     ? existingEvents.find(e =>
         e.id !== event.id &&
@@ -1868,6 +1722,7 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
       endTime:   endTime   || undefined,
       icon:      editIcon !== "none" ? editIcon : undefined,
       earnings:  editEarnings ? parseFloat(editEarnings) : undefined,
+      expenses:  editExpenses ? parseFloat(editExpenses) : undefined,
     });
   };
 
@@ -1875,7 +1730,6 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
     <div className="rounded-xl border border-border bg-popover shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
       <div className="h-0.5" style={{ backgroundColor: STATUS_COLORS[event.status] }}/>
       <div className="p-4">
-        {/* Header */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
@@ -1892,7 +1746,6 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
           </button>
         </div>
 
-        {/* Editable fields */}
         <div className="space-y-2 mb-3">
           <input value={editTitle} onChange={e => { setEditTitle(e.target.value); mark(); }}
             className="w-full text-sm font-medium bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground transition-colors"/>
@@ -1900,10 +1753,8 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
             placeholder="Ответственный"
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
 
-          {/* Time picker */}
           <TimePicker
-            startTime={startTime}
-            endTime={endTime}
+            startTime={startTime} endTime={endTime}
             onStartChange={v => { setStartTime(v); mark(); }}
             onEndChange={v => { setEndTime(v); mark(); }}
           />
@@ -1926,18 +1777,27 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
 
           <IconPicker value={editIcon} onChange={v => { setEditIcon(v); mark(); }}/>
 
-          {/* Earnings */}
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
-            <input
-              type="number" min="0" step="100"
-              value={editEarnings} onChange={e => { setEditEarnings(e.target.value); mark(); }}
-              placeholder="Заработок за смену"
-              className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-3 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+          {/* Earnings + Expenses row */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
+              <input
+                type="number" min="0" step="100"
+                value={editEarnings} onChange={e => { setEditEarnings(e.target.value); mark(); }}
+                placeholder="Заработок"
+                className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+            </div>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400 text-xs font-bold">−</span>
+              <input
+                type="number" min="0" step="100"
+                value={editExpenses} onChange={e => { setEditExpenses(e.target.value); mark(); }}
+                placeholder="Траты"
+                className="w-full text-xs bg-accent/40 border border-rose-500/20 rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-rose-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+            </div>
           </div>
         </div>
 
-        {/* Quick status */}
         <div className="flex gap-1.5 mb-3">
           {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
             <button key={s}
@@ -1950,7 +1810,6 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
           ))}
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2">
           {dirty ? (
             <button onClick={save} disabled={!!conflict}
@@ -1975,7 +1834,6 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
           </button>
         </div>
 
-        {/* Duplicate */}
         <div className="mt-2 border-t border-border pt-2">
           {!dupMode ? (
             <button onClick={() => setDupMode(true)}
@@ -2002,6 +1860,292 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────── FinancePanel ─────────────────────── */
+function FinancePanel({
+  events, goals,
+  totalEarnings, totalExpenses,
+  thisWeekEarnings, thisWeekExpenses,
+  onClose, onAddGoal, onUpdateGoal, onDeleteGoal,
+}: {
+  events: PlannerEvent[];
+  goals: Goal[];
+  totalEarnings: number;
+  totalExpenses: number;
+  thisWeekEarnings: number;
+  thisWeekExpenses: number;
+  onClose: () => void;
+  onAddGoal: (name: string, amount: number) => void;
+  onUpdateGoal: (g: Goal) => void;
+  onDeleteGoal: (id: string) => void;
+}) {
+  const [newGoalName,   setNewGoalName]   = useState("");
+  const [newGoalAmount, setNewGoalAmount] = useState("");
+  const [showAddGoal,   setShowAddGoal]   = useState(false);
+  const [editGoalId,    setEditGoalId]    = useState<string | null>(null);
+  const [editGoalName,  setEditGoalName]  = useState("");
+  const [editGoalAmt,   setEditGoalAmt]   = useState("");
+
+  const monthNet     = totalEarnings - totalExpenses;
+  const weekNet      = thisWeekEarnings - thisWeekExpenses;
+
+  /* Average net per working day this month */
+  const workingDates = [...new Set(
+    events.filter(e => (e.earnings ?? 0) > 0).map(e => e.date)
+  )];
+  const avgDailyEarnings = workingDates.length > 0 ? totalEarnings / workingDates.length : 0;
+  const avgDailyExpenses = workingDates.length > 0 ? totalExpenses / workingDates.length : 0;
+  const avgDailyNet      = avgDailyEarnings - avgDailyExpenses;
+
+  function daysToGoal(goalAmount: number): number | null {
+    if (avgDailyNet <= 0) return null;
+    const remaining = goalAmount - monthNet;
+    if (remaining <= 0) return 0;
+    return Math.ceil(remaining / avgDailyNet);
+  }
+
+  const handleAddGoal = () => {
+    const name = newGoalName.trim();
+    const amount = parseFloat(newGoalAmount);
+    if (!name || isNaN(amount) || amount <= 0) return;
+    onAddGoal(name, amount);
+    setNewGoalName("");
+    setNewGoalAmount("");
+    setShowAddGoal(false);
+  };
+
+  const handleSaveGoalEdit = (id: string) => {
+    const name = editGoalName.trim();
+    const amount = parseFloat(editGoalAmt);
+    if (!name || isNaN(amount) || amount <= 0) return;
+    onUpdateGoal({ id, name, amount });
+    setEditGoalId(null);
+  };
+
+  return (
+    <div className="w-80 border-l border-border bg-card flex flex-col flex-shrink-0 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-violet-400"/>
+          <span className="text-sm font-semibold">Финансы и цели</span>
+        </div>
+        <button onClick={onClose}
+          className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+          <X className="w-3.5 h-3.5"/>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+
+        {/* ── This week ── */}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Эта неделя</p>
+          <div className="grid grid-cols-3 gap-2">
+            <StatCard label="Заработок" value={thisWeekEarnings} color="emerald" icon={<ArrowUpRight className="w-3 h-3"/>}/>
+            <StatCard label="Траты"     value={thisWeekExpenses} color="rose"    icon={<ArrowDownRight className="w-3 h-3"/>}/>
+            <StatCard label="Чистые"    value={weekNet}          color={weekNet >= 0 ? "emerald" : "rose"} icon={<Wallet className="w-3 h-3"/>} highlight/>
+          </div>
+        </div>
+
+        {/* ── This month ── */}
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Этот месяц</p>
+          <div className="grid grid-cols-3 gap-2">
+            <StatCard label="Заработок" value={totalEarnings} color="emerald" icon={<ArrowUpRight className="w-3 h-3"/>}/>
+            <StatCard label="Траты"     value={totalExpenses} color="rose"    icon={<ArrowDownRight className="w-3 h-3"/>}/>
+            <StatCard label="Чистые"    value={monthNet}      color={monthNet >= 0 ? "emerald" : "rose"} icon={<TrendingUp className="w-3 h-3"/>} highlight/>
+          </div>
+          {workingDates.length > 0 && avgDailyNet > 0 && (
+            <p className="text-[10px] text-muted-foreground/50 mt-2">
+              Рабочих дней: <strong className="text-foreground/70">{workingDates.length}</strong> · Среднее в день: <strong className="text-emerald-400/80">{fmtMoney(Math.round(avgDailyNet))}</strong>
+            </p>
+          )}
+        </div>
+
+        {/* ── Goals ── */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-violet-400"/>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Цели</p>
+            </div>
+            <button
+              onClick={() => setShowAddGoal(v => !v)}
+              className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors px-1.5 py-0.5 rounded hover:bg-primary/10">
+              <Plus className="w-3 h-3"/> Добавить
+            </button>
+          </div>
+
+          {showAddGoal && (
+            <div className="mb-3 p-2.5 rounded-lg border border-border bg-accent/20 space-y-2">
+              <input
+                value={newGoalName}
+                onChange={e => setNewGoalName(e.target.value)}
+                placeholder="Название цели"
+                className="w-full text-xs bg-accent/40 border border-border rounded-md px-2 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground"/>
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-violet-400 text-xs font-bold">₽</span>
+                <input
+                  type="number" min="0" step="1000"
+                  value={newGoalAmount}
+                  onChange={e => setNewGoalAmount(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleAddGoal(); }}
+                  placeholder="Сумма цели"
+                  className="w-full text-xs bg-accent/40 border border-border rounded-md pl-6 pr-2 py-1.5 outline-none focus:border-violet-500/60 text-foreground placeholder:text-muted-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+              </div>
+              <div className="flex gap-1.5">
+                <button onClick={handleAddGoal}
+                  className="flex-1 text-[10px] font-semibold py-1 rounded-md bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 border border-violet-500/30 transition-colors">
+                  Сохранить
+                </button>
+                <button onClick={() => { setShowAddGoal(false); setNewGoalName(""); setNewGoalAmount(""); }}
+                  className="px-2 py-1 text-[10px] rounded-md border border-border text-muted-foreground hover:bg-accent transition-colors">
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
+
+          {goals.length === 0 && !showAddGoal && (
+            <div className="text-center py-4">
+              <Trophy className="w-6 h-6 text-muted-foreground/20 mx-auto mb-2"/>
+              <p className="text-[11px] text-muted-foreground/40">Нет целей. Добавьте первую!</p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {goals.map(goal => {
+              const days = daysToGoal(goal.amount);
+              const progress = monthNet > 0 ? Math.min(1, monthNet / goal.amount) : 0;
+              const reached  = monthNet >= goal.amount;
+              const isEditing = editGoalId === goal.id;
+
+              return (
+                <div key={goal.id}
+                  className={`rounded-xl border p-3 space-y-2 ${reached ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-background/40"}`}>
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <input value={editGoalName} onChange={e => setEditGoalName(e.target.value)}
+                        className="w-full text-xs bg-accent/40 border border-border rounded-md px-2 py-1 outline-none focus:border-primary text-foreground"/>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-violet-400 text-xs font-bold">₽</span>
+                        <input type="number" min="0" value={editGoalAmt} onChange={e => setEditGoalAmt(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") handleSaveGoalEdit(goal.id); }}
+                          className="w-full text-xs bg-accent/40 border border-border rounded-md pl-6 pr-2 py-1 outline-none focus:border-violet-500/60 text-foreground [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button onClick={() => handleSaveGoalEdit(goal.id)}
+                          className="flex-1 text-[10px] font-semibold py-0.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                          <Check className="w-3 h-3 inline mr-1"/>Сохранить
+                        </button>
+                        <button onClick={() => setEditGoalId(null)}
+                          className="px-2 text-[10px] rounded border border-border text-muted-foreground hover:bg-accent transition-colors">
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {reached
+                            ? <Trophy className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"/>
+                            : <Target className="w-3.5 h-3.5 text-violet-400/70 flex-shrink-0"/>
+                          }
+                          <span className="text-[12px] font-semibold text-foreground truncate">{goal.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => { setEditGoalId(goal.id); setEditGoalName(goal.name); setEditGoalAmt(String(goal.amount)); }}
+                            className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                            <Pencil className="w-2.5 h-2.5"/>
+                          </button>
+                          <button onClick={() => onDeleteGoal(goal.id)}
+                            className="w-5 h-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent transition-colors">
+                            <X className="w-2.5 h-2.5"/>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-muted-foreground/60">
+                            {fmtMoney(Math.max(0, monthNet))} / {fmtMoney(goal.amount)}
+                          </span>
+                          <span className={`font-bold ${reached ? "text-emerald-400" : "text-violet-400"}`}>
+                            {Math.round(progress * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-accent/40 rounded-full overflow-hidden border border-border/40">
+                          <div className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${progress * 100}%`,
+                              background: reached
+                                ? "linear-gradient(90deg, #10b981, #059669)"
+                                : "linear-gradient(90deg, #8b5cf6, #6366f1)"
+                            }}/>
+                        </div>
+                      </div>
+
+                      {/* Days to goal */}
+                      {reached ? (
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                          <Trophy className="w-3 h-3 text-emerald-400 flex-shrink-0"/>
+                          <span className="text-[11px] font-bold text-emerald-400">Цель достигнута! 🎉</span>
+                        </div>
+                      ) : days !== null ? (
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                          <CalendarDays className="w-3 h-3 text-violet-400 flex-shrink-0"/>
+                          <span className="text-[11px] text-violet-300">
+                            Нужно ещё <strong className="text-violet-400">{days} раб. дн.</strong>
+                            {avgDailyNet > 0 && (
+                              <span className="text-muted-foreground/60"> · {fmtMoney(Math.round(avgDailyNet))}/день</span>
+                            )}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="px-2 py-1.5 rounded-lg bg-accent/40 border border-border/40">
+                          <p className="text-[10px] text-muted-foreground/50">Добавьте события с заработком для расчёта</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Stat card helper ── */
+function StatCard({ label, value, color, icon, highlight }: {
+  label: string; value: number;
+  color: "emerald" | "rose" | string;
+  icon: React.ReactNode;
+  highlight?: boolean;
+}) {
+  const colors: Record<string, { bg: string; text: string; border: string }> = {
+    emerald: { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/20" },
+    rose:    { bg: "bg-rose-500/10",    text: "text-rose-400",    border: "border-rose-500/20" },
+  };
+  const c = colors[color] ?? colors.emerald;
+
+  return (
+    <div className={`rounded-lg border p-2 ${highlight ? `${c.bg} ${c.border}` : "border-border bg-background/30"}`}>
+      <div className={`flex items-center gap-1 mb-1 ${c.text}`}>
+        {icon}
+        <span className="text-[9px] font-medium opacity-70">{label}</span>
+      </div>
+      <p className={`text-[12px] font-bold tabular-nums leading-none ${value === 0 ? "text-muted-foreground/30" : c.text}`}>
+        {value === 0 ? "—" : fmtMoney(value)}
+      </p>
     </div>
   );
 }
