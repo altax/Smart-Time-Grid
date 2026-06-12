@@ -306,9 +306,8 @@ export default function Home() {
         <table className="border-collapse" style={{ tableLayout: "fixed" }}>
           <colgroup>
             <col style={{ width: 210, minWidth: 210 }}/>
-            {days.map(d => <col key={d.toISOString()} style={{ width: 36, minWidth: 36 }}/>)}
+            {days.map(d => <col key={d.toISOString()} style={{ width: 58, minWidth: 58 }}/>)}
             <col style={{ width: 44, minWidth: 44 }}/>
-            <col style={{ width: 280, minWidth: 280 }}/>
           </colgroup>
 
           <thead className="sticky top-0 z-20">
@@ -342,32 +341,6 @@ export default function Home() {
               <th className="bg-card border-b border-l border-border py-1 text-center">
                 <span className="text-[9px] text-muted-foreground/50 uppercase">∑</span>
               </th>
-              <th className="sticky right-0 z-20 bg-card border-b border-l border-border/60 px-3 pb-1.5 pt-1 align-bottom"
-                style={{ minWidth: 280, width: 280 }}>
-                <div className="flex items-center justify-between mb-1">
-                  <button
-                    onClick={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
-                    className={`text-[9px] font-semibold uppercase tracking-wider transition-colors
-                      ${dayPanel === format(new Date(), "yyyy-MM-dd") ? "text-primary" : "text-muted-foreground hover:text-primary"}`}>
-                    {(() => {
-                      try {
-                        if (dayPanel === format(new Date(), "yyyy-MM-dd")) return "Сегодня · таймлайн";
-                        return format(parseISO(dayPanel), "d MMM, EEE", { locale: ru }) + " · таймлайн";
-                      } catch { return "Таймлайн"; }
-                    })()}
-                  </button>
-                  <span className="text-[8px] text-muted-foreground/40">← клик на дату</span>
-                </div>
-                <div className="relative h-3 mx-1">
-                  {[0, 6, 12, 18, 24].map(h => (
-                    <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
-                      style={{ left: `${(h / 24) * 100}%` }}>
-                      <span className="text-[7px] text-muted-foreground/55 font-mono leading-none">{h}</span>
-                      <div className="w-px h-1.5 bg-border/40 mt-0.5"/>
-                    </div>
-                  ))}
-                </div>
-              </th>
             </tr>
           </thead>
 
@@ -398,7 +371,6 @@ export default function Home() {
                 entity={entity}
                 days={days}
                 eventCount={getEventCountForEntity(entity.id)}
-                dayPanel={dayPanel}
                 getEventsForCell={getEventsForCell}
                 dragOverKey={dragOverKey}
                 onCellClick={openAdd}
@@ -564,7 +536,6 @@ interface EntityRowProps {
   entity: Entity;
   days: Date[];
   eventCount: number;
-  dayPanel: string;
   dragOverKey: string | null;
   getEventsForCell: (eId: string, date: string) => PlannerEvent[];
   onCellClick: (eId: string, date: string, rect: DOMRect) => void;
@@ -580,7 +551,7 @@ interface EntityRowProps {
 }
 
 function EntityRow({
-  entity, days, eventCount, dayPanel, dragOverKey,
+  entity, days, eventCount, dragOverKey,
   getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick,
   onDragStart, onDragEnd, onDragOver, onDrop,
   onDeleteEntity, onRenameEntity,
@@ -644,7 +615,7 @@ function EntityRow({
 
         return (
           <td key={dateStr}
-            className={`p-[3px] transition-all
+            className={`px-0.5 py-[3px] transition-all
               ${wknd ? "bg-white/[0.012]" : ""}
               ${tod  ? "bg-primary/[0.07]" : ""}
               ${isDragTarget ? "bg-primary/20 ring-1 ring-inset ring-primary/40 rounded" : ""}`}
@@ -675,100 +646,6 @@ function EntityRow({
         }
       </td>
 
-      {/* ── Inline day timeline (sticky right) ── */}
-      <td className="sticky right-0 z-10 bg-background border-l border-border/30 px-2 py-1 group-hover:bg-[#1e2535] transition-colors"
-        style={{ minWidth: 280, width: 280 }}>
-        {(() => {
-          const dayEvs      = getEventsForCell(entity.id, dayPanel);
-          const timedEvs    = dayEvs.filter(ev => ev.startTime && ev.endTime);
-          const untimedEvs  = dayEvs.filter(ev => !ev.startTime);
-          const now         = new Date();
-          const todayStr    = format(now, "yyyy-MM-dd");
-          const isToday     = dayPanel === todayStr;
-          const nowPct      = isToday ? ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100 : null;
-
-          const busy = timedEvs.reduce((acc, ev) => {
-            const [sh, sm] = ev.startTime!.split(":").map(Number);
-            const [eh, em] = ev.endTime!.split(":").map(Number);
-            return acc + (eh * 60 + em) - (sh * 60 + sm);
-          }, 0);
-          const busyLabel = busy > 0
-            ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""}`
-            : null;
-
-          return (
-            <div className="flex items-center gap-1.5">
-              {/* Left label: busy time or dash */}
-              <div className="flex-shrink-0 w-9 text-right">
-                {busyLabel
-                  ? <span className="text-[9px] font-semibold leading-none" style={{ color: entity.color }}>{busyLabel}</span>
-                  : untimedEvs.length > 0
-                    ? <span className="text-[9px] text-muted-foreground/50">{untimedEvs.length}×</span>
-                    : <span className="text-[9px] text-muted-foreground/20">—</span>
-                }
-              </div>
-
-              {/* Timeline track */}
-              <div className="flex-1 relative h-4 rounded overflow-hidden"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
-
-                {/* Subtle hour grid lines */}
-                {[6, 12, 18].map(h => (
-                  <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
-                    style={{ left: `${(h / 24) * 100}%`, backgroundColor: "rgba(255,255,255,0.10)" }}/>
-                ))}
-
-                {/* Timed event blocks */}
-                {timedEvs.map(ev => {
-                  const l   = timePct(ev.startTime!);
-                  const r   = timePct(ev.endTime!);
-                  const w   = Math.max(r - l, 0.5);
-                  const dur = calcDuration(ev.startTime!, ev.endTime!);
-                  return (
-                    <div key={ev.id}
-                      className="absolute top-0.5 bottom-0.5 rounded-sm group/bar cursor-default overflow-hidden"
-                      style={{ left: `${l}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status] }}
-                      title={`${ev.title} · ${ev.startTime}–${ev.endTime} (${dur})`}>
-                      {w > 8 && (
-                        <span className="absolute inset-0 flex items-center px-0.5">
-                          <span className="text-[7px] text-white/80 font-mono leading-none truncate">
-                            {fmtTime(ev.startTime!)}
-                          </span>
-                        </span>
-                      )}
-                      {/* Hover tooltip */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/bar:flex
-                        flex-col items-center pointer-events-none z-50 whitespace-nowrap">
-                        <div className="bg-popover border border-border rounded-lg px-2.5 py-1.5 shadow-xl">
-                          <p className="text-[10px] font-semibold text-foreground leading-tight">{ev.title}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">{ev.startTime} – {ev.endTime} · {dur}</p>
-                        </div>
-                        <div className="w-1.5 h-1.5 bg-popover border-r border-b border-border rotate-45 -mt-1"/>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* Untimed events — small dots at far left */}
-                {untimedEvs.map((ev, i) => (
-                  <div key={ev.id}
-                    className="absolute top-0.5 bottom-0.5 w-1 rounded-sm"
-                    style={{ left: `${i * 1.8}%`, backgroundColor: STATUS_COLORS[ev.status], opacity: 0.55 }}
-                    title={ev.title}/>
-                ))}
-
-                {/* Current-time needle */}
-                {nowPct !== null && (
-                  <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none"
-                    style={{ left: `${nowPct}%` }}>
-                    <div className="absolute -top-px left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-400"/>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-      </td>
     </tr>
   );
 }
@@ -1172,9 +1049,18 @@ function GridCell({
     return (
       <div ref={ref} data-testid={`cell-empty-${entityId}-${date}`}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className="group/c w-7 h-7 rounded cursor-pointer flex items-center justify-center
-          border border-transparent hover:border-border hover:bg-white/[0.04] transition-all">
-        <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/50 transition-colors"/>
+        className="group/c w-full flex flex-col items-center gap-[3px] py-0.5 cursor-pointer rounded
+          hover:bg-white/[0.04] transition-all">
+        {/* Empty status indicator */}
+        <div className="w-[18px] h-[18px] rounded border border-transparent
+          group-hover/c:border-border/60 flex items-center justify-center transition-all">
+          <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/40 transition-colors"/>
+        </div>
+        {/* Empty time track */}
+        <div className="w-full h-[9px] rounded-sm"
+          style={{ backgroundColor: "rgba(255,255,255,0.025)" }}/>
+        {/* Spacer for alignment */}
+        <span className="text-[7px] leading-none opacity-0 select-none">0</span>
       </div>
     );
   }
@@ -1184,14 +1070,14 @@ function GridCell({
   const dur     = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
   const color   = STATUS_COLORS[first.status];
 
-  /* strip metrics */
+  /* time bar metrics within 6–22h window */
   const stripStart = hasTime ? workPct(first.startTime!) : 0;
   const stripEnd   = hasTime ? workPct(first.endTime!)   : 0;
   const stripW     = Math.max(5, stripEnd - stripStart);
 
   return (
     <>
-      {/* Outer wrapper: square + optional time strip */}
+      {/* ── Cell: indicator + time bar + label ── */}
       <div ref={ref}
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
@@ -1205,41 +1091,52 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className="flex flex-col items-center gap-[3px] cursor-grab active:cursor-grabbing group/ev">
+        className="flex flex-col items-center gap-[3px] w-full py-0.5 cursor-grab active:cursor-grabbing group/ev">
 
-        {/* ── Status square ── clean, icon overlay bottom-right ── */}
+        {/* ── Status dot ── */}
         <div
-          className="w-7 h-7 rounded relative transition-all
+          className="w-[18px] h-[18px] rounded relative flex-shrink-0 transition-all
             group-hover/ev:brightness-110 group-hover/ev:scale-110
             group-active/ev:scale-95 group-active/ev:opacity-60"
           style={{ backgroundColor: color }}>
-          {/* Icon overlay */}
           {first.icon && first.icon !== "none" && (
-            <span className="absolute bottom-0.5 right-0.5 w-3 h-3 flex items-center justify-center">
-              <EventIconBadge icon={first.icon} size={10}/>
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 flex items-center justify-center">
+              <EventIconBadge icon={first.icon} size={9}/>
             </span>
           )}
-          {/* Multi-event badge */}
           {events.length > 1 && (
-            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-background border border-border
-              text-[7px] font-bold flex items-center justify-center text-foreground z-10">
+            <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-background border border-border
+              text-[6px] font-bold flex items-center justify-center text-foreground z-10">
               {events.length}
             </span>
           )}
         </div>
 
-        {/* ── Time strip: track + coloured block showing position in 6–22 h window ── */}
-        {hasTime && (
-          <div className="relative w-7 h-[5px] rounded-full overflow-hidden"
-            style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-            {/* Noon reference tick */}
-            <div className="absolute top-0 bottom-0 w-px"
-              style={{ left: `${workPct("12:00")}%`, backgroundColor: "rgba(255,255,255,0.18)" }}/>
-            {/* Event block */}
-            <div className="absolute top-0 h-full rounded-full"
-              style={{ left: `${stripStart}%`, width: `${stripW}%`, backgroundColor: color, opacity: 0.9 }}/>
-          </div>
-        )}
+        {/* ── Time bar: shows WHEN and HOW LONG within 6–22h window ── */}
+        <div className="relative w-full h-[9px] rounded-sm overflow-hidden"
+          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+          {hasTime ? (
+            <>
+              {/* Hour ticks at 6, 12, 18 */}
+              {[workPct("06:00"), workPct("12:00"), workPct("18:00")].map((p, i) => (
+                <div key={i} className="absolute top-0 bottom-0 w-px"
+                  style={{ left: `${p}%`, backgroundColor: i === 1 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.10)" }}/>
+              ))}
+              {/* Event block — position = start time, width = duration */}
+              <div className="absolute top-0 bottom-0 rounded-sm"
+                style={{ left: `${stripStart}%`, width: `${stripW}%`, backgroundColor: color }}/>
+            </>
+          ) : (
+            /* No time: subtle full-width tint */
+            <div className="absolute inset-0" style={{ backgroundColor: color, opacity: 0.25 }}/>
+          )}
+        </div>
+
+        {/* ── Duration label ── */}
+        <span className="text-[7px] leading-none font-mono tracking-tight"
+          style={{ color: hasTime ? `${color}cc` : "transparent" }}>
+          {hasTime ? dur : "—"}
+        </span>
       </div>
 
       {/* Rich hover tooltip */}
