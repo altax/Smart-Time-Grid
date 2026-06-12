@@ -308,6 +308,7 @@ export default function Home() {
             <col style={{ width: 210, minWidth: 210 }}/>
             {days.map(d => <col key={d.toISOString()} style={{ width: 36, minWidth: 36 }}/>)}
             <col style={{ width: 44, minWidth: 44 }}/>
+            <col style={{ width: 280, minWidth: 280 }}/>
           </colgroup>
 
           <thead className="sticky top-0 z-20">
@@ -341,6 +342,32 @@ export default function Home() {
               <th className="bg-card border-b border-l border-border py-1 text-center">
                 <span className="text-[9px] text-muted-foreground/50 uppercase">∑</span>
               </th>
+              <th className="sticky right-0 z-20 bg-card border-b border-l border-border/60 px-3 pb-1.5 pt-1 align-bottom"
+                style={{ minWidth: 280, width: 280 }}>
+                <div className="flex items-center justify-between mb-1">
+                  <button
+                    onClick={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
+                    className={`text-[9px] font-semibold uppercase tracking-wider transition-colors
+                      ${dayPanel === format(new Date(), "yyyy-MM-dd") ? "text-primary" : "text-muted-foreground hover:text-primary"}`}>
+                    {(() => {
+                      try {
+                        if (dayPanel === format(new Date(), "yyyy-MM-dd")) return "Сегодня · таймлайн";
+                        return format(parseISO(dayPanel), "d MMM, EEE", { locale: ru }) + " · таймлайн";
+                      } catch { return "Таймлайн"; }
+                    })()}
+                  </button>
+                  <span className="text-[8px] text-muted-foreground/40">← клик на дату</span>
+                </div>
+                <div className="relative h-3 mx-1">
+                  {[0, 6, 12, 18, 24].map(h => (
+                    <div key={h} className="absolute flex flex-col items-center -translate-x-1/2"
+                      style={{ left: `${(h / 24) * 100}%` }}>
+                      <span className="text-[7px] text-muted-foreground/55 font-mono leading-none">{h}</span>
+                      <div className="w-px h-1.5 bg-border/40 mt-0.5"/>
+                    </div>
+                  ))}
+                </div>
+              </th>
             </tr>
           </thead>
 
@@ -371,6 +398,7 @@ export default function Home() {
                 entity={entity}
                 days={days}
                 eventCount={getEventCountForEntity(entity.id)}
+                dayPanel={dayPanel}
                 getEventsForCell={getEventsForCell}
                 dragOverKey={dragOverKey}
                 onCellClick={openAdd}
@@ -423,15 +451,6 @@ export default function Home() {
         </table>
       </div>
 
-      {/* ── Horizontal Day Timeline ── always visible, switches day on header click ── */}
-      {entities.length > 0 && (
-        <HorizontalTimeline
-          date={dayPanel}
-          entities={entities}
-          getEventsForCell={getEventsForCell}
-          onDayReset={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
-        />
-      )}
 
       {/* ── Status bar ── */}
       <footer className="flex items-center gap-5 px-5 py-2 border-t border-border flex-shrink-0 text-xs text-muted-foreground">
@@ -545,6 +564,7 @@ interface EntityRowProps {
   entity: Entity;
   days: Date[];
   eventCount: number;
+  dayPanel: string;
   dragOverKey: string | null;
   getEventsForCell: (eId: string, date: string) => PlannerEvent[];
   onCellClick: (eId: string, date: string, rect: DOMRect) => void;
@@ -560,7 +580,7 @@ interface EntityRowProps {
 }
 
 function EntityRow({
-  entity, days, eventCount, dragOverKey,
+  entity, days, eventCount, dayPanel, dragOverKey,
   getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick,
   onDragStart, onDragEnd, onDragOver, onDrop,
   onDeleteEntity, onRenameEntity,
@@ -653,6 +673,101 @@ function EntityRow({
               style={{ backgroundColor:`${entity.color}25`, color:entity.color }}>{eventCount}</span>
           : <span className="text-[10px] text-muted-foreground/30">—</span>
         }
+      </td>
+
+      {/* ── Inline day timeline (sticky right) ── */}
+      <td className="sticky right-0 z-10 bg-background border-l border-border/30 px-2 py-1 group-hover:bg-[#1e2535] transition-colors"
+        style={{ minWidth: 280, width: 280 }}>
+        {(() => {
+          const dayEvs      = getEventsForCell(entity.id, dayPanel);
+          const timedEvs    = dayEvs.filter(ev => ev.startTime && ev.endTime);
+          const untimedEvs  = dayEvs.filter(ev => !ev.startTime);
+          const now         = new Date();
+          const todayStr    = format(now, "yyyy-MM-dd");
+          const isToday     = dayPanel === todayStr;
+          const nowPct      = isToday ? ((now.getHours() * 60 + now.getMinutes()) / 1440) * 100 : null;
+
+          const busy = timedEvs.reduce((acc, ev) => {
+            const [sh, sm] = ev.startTime!.split(":").map(Number);
+            const [eh, em] = ev.endTime!.split(":").map(Number);
+            return acc + (eh * 60 + em) - (sh * 60 + sm);
+          }, 0);
+          const busyLabel = busy > 0
+            ? `${Math.floor(busy / 60)}ч${busy % 60 > 0 ? ` ${busy % 60}м` : ""}`
+            : null;
+
+          return (
+            <div className="flex items-center gap-1.5">
+              {/* Left label: busy time or dash */}
+              <div className="flex-shrink-0 w-9 text-right">
+                {busyLabel
+                  ? <span className="text-[9px] font-semibold leading-none" style={{ color: entity.color }}>{busyLabel}</span>
+                  : untimedEvs.length > 0
+                    ? <span className="text-[9px] text-muted-foreground/50">{untimedEvs.length}×</span>
+                    : <span className="text-[9px] text-muted-foreground/20">—</span>
+                }
+              </div>
+
+              {/* Timeline track */}
+              <div className="flex-1 relative h-4 rounded overflow-hidden"
+                style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+
+                {/* Subtle hour grid lines */}
+                {[6, 12, 18].map(h => (
+                  <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
+                    style={{ left: `${(h / 24) * 100}%`, backgroundColor: "rgba(255,255,255,0.10)" }}/>
+                ))}
+
+                {/* Timed event blocks */}
+                {timedEvs.map(ev => {
+                  const l   = timePct(ev.startTime!);
+                  const r   = timePct(ev.endTime!);
+                  const w   = Math.max(r - l, 0.5);
+                  const dur = calcDuration(ev.startTime!, ev.endTime!);
+                  return (
+                    <div key={ev.id}
+                      className="absolute top-0.5 bottom-0.5 rounded-sm group/bar cursor-default overflow-hidden"
+                      style={{ left: `${l}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status] }}
+                      title={`${ev.title} · ${ev.startTime}–${ev.endTime} (${dur})`}>
+                      {w > 8 && (
+                        <span className="absolute inset-0 flex items-center px-0.5">
+                          <span className="text-[7px] text-white/80 font-mono leading-none truncate">
+                            {fmtTime(ev.startTime!)}
+                          </span>
+                        </span>
+                      )}
+                      {/* Hover tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/bar:flex
+                        flex-col items-center pointer-events-none z-50 whitespace-nowrap">
+                        <div className="bg-popover border border-border rounded-lg px-2.5 py-1.5 shadow-xl">
+                          <p className="text-[10px] font-semibold text-foreground leading-tight">{ev.title}</p>
+                          <p className="text-[9px] text-muted-foreground mt-0.5">{ev.startTime} – {ev.endTime} · {dur}</p>
+                        </div>
+                        <div className="w-1.5 h-1.5 bg-popover border-r border-b border-border rotate-45 -mt-1"/>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Untimed events — small dots at far left */}
+                {untimedEvs.map((ev, i) => (
+                  <div key={ev.id}
+                    className="absolute top-0.5 bottom-0.5 w-1 rounded-sm"
+                    style={{ left: `${i * 1.8}%`, backgroundColor: STATUS_COLORS[ev.status], opacity: 0.55 }}
+                    title={ev.title}/>
+                ))}
+
+                {/* Current-time needle */}
+                {nowPct !== null && (
+                  <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none"
+                    style={{ left: `${nowPct}%` }}>
+                    <div className="absolute -top-px left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-400"/>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </td>
     </tr>
   );
