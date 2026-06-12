@@ -15,7 +15,7 @@ import {
   Entity, PlannerEvent, EventStatus, EventIcon,
   STATUS_COLORS, STATUS_GRADIENTS, STATUS_LABELS, STATUS_CYCLE,
   EVENT_ICON_LABELS,
-  calcDuration, calcDurationMins, fmtTime, addMinutes, hasTimeOverlap,
+  calcDuration, calcDurationMins, fmtTime, addMinutes, hasTimeOverlap, timeToMins,
 } from "../types";
 
 /* ── Ozon PVZ icon ── */
@@ -517,26 +517,38 @@ export default function Home() {
       <footer className="border-t border-border flex-shrink-0">
         {/* Weekly earnings strip */}
         {totalEarnings > 0 && (
-          <div className="flex items-center gap-0 px-5 py-1.5 border-b border-border/40 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            <span className="text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-wider mr-3 flex-shrink-0">По неделям</span>
-            <div className="flex items-center gap-2 flex-1">
-              {weekGroups.map((wDays, i) => {
-                const earn = weekEarnings(wDays);
-                const label = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d")}`;
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-border/40 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {/* Week cards */}
+            {(() => {
+              const maxW = Math.max(...weekGroups.map(w => weekEarnings(w)), 1);
+              return weekGroups.map((wDays, i) => {
+                const earn  = weekEarnings(wDays);
+                const pctFill = (earn / maxW) * 100;
+                const label = `${format(wDays[0], "d")}–${format(wDays[wDays.length - 1], "d MMM", { locale: ru })}`;
                 return (
-                  <div key={i} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-background/60 border border-border/30 flex-shrink-0">
-                    <span className="text-[9px] text-muted-foreground/50">{label}</span>
-                    <span className={`text-[9px] font-bold ${earn > 0 ? "text-emerald-400" : "text-muted-foreground/30"}`}>
-                      {earn > 0 ? fmtMoney(earn) : "—"}
-                    </span>
+                  <div key={i} className="flex-shrink-0 relative rounded-lg border border-border/40 bg-background/50 overflow-hidden"
+                    style={{ minWidth: 88 }}>
+                    {/* Proportional fill bar at bottom */}
+                    <div className="absolute bottom-0 left-0 h-0.5 rounded-full transition-all"
+                      style={{ width: `${pctFill}%`, backgroundColor: earn > 0 ? "rgb(52,211,153)" : "transparent" }}/>
+                    <div className="px-3 py-1.5">
+                      <p className="text-[10px] text-muted-foreground/60 leading-none mb-1">{label}</p>
+                      <p className={`text-[13px] font-bold leading-none tabular-nums ${earn > 0 ? "text-emerald-400" : "text-muted-foreground/25"}`}>
+                        {earn > 0 ? fmtMoney(earn) : "—"}
+                      </p>
+                    </div>
                   </div>
                 );
-              })}
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 ml-3 flex-shrink-0">
-              <TrendingUp className="w-3 h-3 text-emerald-400"/>
-              <span className="text-[10px] font-bold text-emerald-400">{fmtMoney(totalEarnings)}</span>
-              <span className="text-[9px] text-emerald-400/60">за месяц</span>
+              });
+            })()}
+
+            {/* Month total */}
+            <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 ml-auto">
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0"/>
+              <div>
+                <p className="text-[9px] text-emerald-400/60 leading-none mb-0.5">За месяц</p>
+                <p className="text-[14px] font-bold text-emerald-400 leading-none tabular-nums">{fmtMoney(totalEarnings)}</p>
+              </div>
             </div>
           </div>
         )}
@@ -958,7 +970,7 @@ function HorizontalTimeline({
             <div className="flex-1 relative h-8 rounded-md overflow-hidden"
               style={{ backgroundColor: "rgba(255,255,255,0.05)" }}>
 
-              {/* Hour grid lines — every hour */}
+              {/* Hour grid lines */}
               {Array.from({ length: 23 }, (_, i) => i + 1).map(h => (
                 <div key={h} className="absolute top-0 bottom-0 w-px pointer-events-none"
                   style={{
@@ -971,40 +983,68 @@ function HorizontalTimeline({
                   }}/>
               ))}
 
-              {/* Event blocks */}
+              {/* ── Free-time gaps (6:00–22:00 work window) ── */}
+              {(() => {
+                const WORK_S = 6 * 60, WORK_E = 22 * 60;
+                const sorted = [...timedEvs].sort((a, b) => timeToMins(a.startTime!) - timeToMins(b.startTime!));
+                const gaps: { s: number; e: number }[] = [];
+                let cur = WORK_S;
+                for (const ev of sorted) {
+                  const es = timeToMins(ev.startTime!), ee = timeToMins(ev.endTime!);
+                  if (es > cur) gaps.push({ s: cur, e: es });
+                  cur = Math.max(cur, ee);
+                }
+                if (cur < WORK_E) gaps.push({ s: cur, e: WORK_E });
+                return gaps.map((g, i) => {
+                  const l = (g.s / 1440) * 100, w = ((g.e - g.s) / 1440) * 100;
+                  const mins = g.e - g.s;
+                  const label = mins >= 60
+                    ? `${Math.floor(mins / 60)}ч${mins % 60 > 0 ? `\u00a0${mins % 60}м` : ""}`
+                    : `${mins}м`;
+                  return (
+                    <div key={i} className="absolute top-0 bottom-0 flex items-center justify-center overflow-hidden"
+                      style={{ left: `${l}%`, width: `${w}%`, background: "rgba(74,222,128,0.08)" }}>
+                      <div className="absolute inset-x-0 top-1/2 h-px bg-emerald-400/20"/>
+                      {w > 2.5 && (
+                        <span className="relative z-10 text-[8px] font-semibold text-emerald-400/55 px-0.5 leading-none select-none">
+                          {label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* ── Event bars with inline text ── */}
               {timedEvs.map(ev => {
-                const l = pct(ev.startTime!);
-                const w = Math.max(pct(ev.endTime!) - l, 0.4);
-                const color = STATUS_COLORS[ev.status];
-                const dur   = calcDuration(ev.startTime!, ev.endTime!);
+                const l   = pct(ev.startTime!);
+                const w   = Math.max(pct(ev.endTime!) - l, 0.4);
+                const dur = calcDuration(ev.startTime!, ev.endTime!);
                 return (
                   <div key={ev.id}
-                    className="absolute top-0.5 bottom-0.5 rounded-sm group/bar cursor-default overflow-hidden"
-                    style={{ left: `${l}%`, width: `${w}%`, backgroundColor: color }}
-                    title={`${ev.title} · ${ev.startTime}–${ev.endTime} (${dur})`}>
-                    {/* Icon inside bar (only when wide enough) */}
-                    {ev.icon && ev.icon !== "none" && w > 2 && (
-                      <span className="absolute left-0.5 top-1/2 -translate-y-1/2 opacity-90">
-                        <EventIconBadge icon={ev.icon} size={11}/>
+                    className="absolute top-0.5 bottom-0.5 rounded-sm overflow-hidden flex flex-col justify-center px-1.5 cursor-default"
+                    style={{ left: `${l}%`, width: `${w}%`, backgroundColor: STATUS_COLORS[ev.status] }}>
+                    {w > 3.5 && (
+                      <span className="text-white text-[10px] font-bold leading-tight truncate drop-shadow-sm">
+                        {ev.title}
                       </span>
                     )}
-                    {/* Tooltip on hover */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/bar:flex
-                      flex-col items-center pointer-events-none z-50 whitespace-nowrap">
-                      <div className="bg-popover border border-border rounded-lg px-2.5 py-1.5 shadow-xl">
-                        <div className="flex items-center gap-1.5">
-                          {ev.icon && ev.icon !== "none" && <EventIconBadge icon={ev.icon} size={11}/>}
-                          <p className="text-[10px] font-semibold text-foreground leading-tight">{ev.title}</p>
-                        </div>
-                        <p className="text-[9px] text-muted-foreground mt-0.5">{ev.startTime} – {ev.endTime} · {dur}</p>
-                      </div>
-                      <div className="w-1.5 h-1.5 bg-popover border-r border-b border-border rotate-45 -mt-1"/>
-                    </div>
+                    {w > 2 && (
+                      <span className="text-white/80 text-[9px] font-mono leading-none truncate">
+                        {fmtTime(ev.startTime!)}–{fmtTime(ev.endTime!)}
+                        {w > 5 && ` · ${dur}`}
+                      </span>
+                    )}
+                    {ev.icon && ev.icon !== "none" && w <= 2 && (
+                      <span className="absolute left-0.5 top-1/2 -translate-y-1/2">
+                        <EventIconBadge icon={ev.icon} size={10}/>
+                      </span>
+                    )}
                   </div>
                 );
               })}
 
-              {/* Current-time red needle */}
+              {/* Current-time needle */}
               {nowPct !== null && (
                 <div className="absolute top-0 bottom-0 w-0.5 rounded-full bg-red-400 z-10 pointer-events-none"
                   style={{ left: `${nowPct}%` }}>
