@@ -378,32 +378,30 @@ export default function Home() {
         <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
           <table className="border-collapse" style={{ tableLayout: "fixed" }}>
             <colgroup>
-              <col style={{ width: 180, minWidth: 180 }}/>
-              {days.map(d => <col key={d.toISOString()} style={{ width: 34, minWidth: 34 }}/>)}
+              <col style={{ width: 160, minWidth: 160 }}/>
+              {days.map(d => <col key={d.toISOString()} style={{ width: 28, minWidth: 28 }}/>)}
             </colgroup>
 
             <thead className="sticky top-0 z-20">
               {/* ── Day numbers row ── */}
               <tr>
-                <th className="bg-card border-b border-border/40 border-r border-border/40 px-3 py-2 text-left align-middle">
-                  <span className="text-[11px] font-semibold text-muted-foreground/70 tracking-wide">Ресторан</span>
+                <th className="bg-card border-b border-r border-border/50 px-3 py-2 text-left align-middle">
+                  <span className="text-[11px] font-medium text-muted-foreground/60 tracking-wide">Ресторан</span>
                 </th>
                 {days.map(day => {
                   const tod   = isToday(day), wknd = isWeekend(day);
-                  const isMon = day.getDay() === 1;
                   return (
                     <th key={day.toISOString()}
                       ref={tod ? todayThRef : undefined}
-                      className={`border-b border-border/40 py-1.5 text-center align-middle
-                        ${isMon ? "border-l border-l-border/30" : ""}
-                        ${wknd ? "bg-background" : "bg-card"}
-                        ${tod ? "bg-primary/10" : ""}`}>
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className={`text-[11px] font-bold w-[18px] h-[18px] flex items-center justify-center rounded-full leading-none
-                          ${tod ? "bg-primary text-primary-foreground" : wknd ? "text-muted-foreground/50" : "text-foreground/70"}`}>
+                      className={`border-b border-r border-border/30 py-1.5 text-center align-middle
+                        ${wknd ? "bg-muted/40" : "bg-card"}`}>
+                      <div className="flex flex-col items-center gap-[2px]">
+                        <span className={`text-[10px] font-bold w-[17px] h-[17px] flex items-center justify-center rounded-full leading-none
+                          ${tod ? "text-white" : wknd ? "text-muted-foreground/45" : "text-foreground/65"}`}
+                          style={tod ? { backgroundColor: "#f06060" } : {}}>
                           {format(day, "d")}
                         </span>
-                        <span className={`text-[8px] font-medium leading-none ${wknd ? "text-muted-foreground/35" : "text-muted-foreground/50"}`}>
+                        <span className={`text-[7px] font-medium leading-none ${wknd ? "text-muted-foreground/30" : "text-muted-foreground/45"}`}>
                           {DAY_ABBR[day.getDay()]}
                         </span>
                       </div>
@@ -686,11 +684,11 @@ function EntityRow({
   };
 
   return (
-    <tr className="group border-b border-border/20 hover:bg-white/[0.015] transition-colors">
+    <tr className="group hover:brightness-[1.08] transition-all">
       {/* Name */}
-      <td className="border-r border-border/20 px-3 py-1.5 sticky left-0 bg-background z-10 group-hover:bg-[#0f1121] transition-colors">
+      <td className="border-r border-b border-border/40 px-3 py-0 sticky left-0 bg-background z-10 group-hover:bg-accent/30 transition-colors h-[32px]">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 opacity-80" style={{ backgroundColor: entity.color }}/>
+          <span className="w-[6px] h-[6px] rounded-full flex-shrink-0" style={{ backgroundColor: entity.color }}/>
           {editing ? (
             <input ref={inputRef} value={editName}
               onChange={e => setEditName(e.target.value)}
@@ -701,18 +699,18 @@ function EntityRow({
               }}
               className="text-[12px] bg-transparent border-b border-primary outline-none flex-1 min-w-0 text-foreground"/>
           ) : (
-            <span className="text-[12px] truncate cursor-default text-foreground/80" onDoubleClick={() => setEditing(true)} title={entity.name}>
+            <span className="text-[12px] truncate cursor-default text-foreground/75" onDoubleClick={() => setEditing(true)} title={entity.name}>
               {entity.name}
             </span>
           )}
           {!editing && (
             <div className="flex items-center gap-0.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
               <button onClick={() => setEditing(true)} title="Переименовать"
-                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-accent">
+                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-white/10">
                 <Pencil className="w-2.5 h-2.5"/>
               </button>
               <button onClick={() => onDeleteEntity(entity.id)} title="Удалить"
-                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-accent">
+                className="w-4 h-4 rounded flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-white/10">
                 <Trash2 className="w-2.5 h-2.5"/>
               </button>
             </div>
@@ -727,14 +725,12 @@ function EntityRow({
         const wknd = isWeekend(day), tod = isToday(day);
         const key = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
-        const isMon = day.getDay() === 1;
         return (
           <td key={dateStr}
-            className={`px-0.5 py-0.5 transition-all align-middle h-[38px]
-              ${isMon ? "border-l border-l-border/20" : ""}
-              ${wknd ? "bg-white/[0.008]" : ""}
-              ${tod  ? "bg-primary/[0.05]" : ""}
-              ${isDragTarget ? "bg-primary/15 ring-1 ring-inset ring-primary/30 rounded" : ""}`}
+            className={`border-r border-b border-border/30 p-0 align-middle h-[32px]
+              ${wknd ? "bg-muted/25" : "bg-accent/20"}
+              ${tod  ? "bg-[#f06060]/[0.07]" : ""}
+              ${isDragTarget ? "bg-[#f06060]/15 ring-1 ring-inset ring-[#f06060]/30" : ""}`}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}
             onDrop={e => { e.preventDefault(); onDrop(entity.id, dateStr); }}>
@@ -1008,37 +1004,36 @@ function GridCell({
         onMouseEnter={onCellEnter}
         onMouseLeave={onCellLeave}
         onClick={() => ref.current && onAddClick(entityId, date, ref.current.getBoundingClientRect())}
-        className={`group/c w-full h-full min-h-[30px] flex items-center justify-center cursor-pointer rounded transition-colors
-          ${copiedEventId ? "hover:bg-sky-500/10" : "hover:bg-white/[0.04]"}`}>
-        <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/25 transition-colors"/>
+        className="group/c w-full h-full flex items-center justify-center cursor-pointer transition-colors hover:bg-white/[0.06]">
+        <Plus className="w-2.5 h-2.5 text-transparent group-hover/c:text-muted-foreground/30 transition-colors"/>
       </div>
     );
   }
 
-  /* ── Multi-event cell: stacked colored blocks ── */
+  /* ── Multi-event cell: stacked slim vertical bars ── */
   if (events.length > 1) {
     return (
       <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
         onMouseEnter={onCellEnter}
         onMouseLeave={onCellLeave}
-        className="w-full h-full min-h-[30px] flex items-center justify-center gap-[2px] cursor-pointer"
+        className="w-full h-full flex items-center justify-center gap-[2px] cursor-pointer"
         onClick={e => { e.stopPropagation(); ref.current && onEventClick(events[0], ref.current.getBoundingClientRect()); }}>
         {events.slice(0, 3).map(ev => (
           <button key={ev.id}
             onClick={e => { e.stopPropagation(); ref.current && onEventClick(ev, ref.current.getBoundingClientRect()); }}
             onContextMenu={e => { e.stopPropagation(); onContextMenu(e.nativeEvent, ev); }}
-            className="w-[7px] h-[22px] rounded-[2px] flex-shrink-0 hover:brightness-125 transition-all"
-            style={{ backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.45 : 0.9 }}
+            className="w-[6px] h-[20px] rounded-[2px] flex-shrink-0 hover:brightness-125 transition-all"
+            style={{ backgroundColor: STATUS_COLORS[ev.status], opacity: ev.done ? 0.4 : 0.85 }}
           />
         ))}
         {events.length > 3 && (
-          <span className="text-[7px] text-muted-foreground/40 leading-none">+{events.length - 3}</span>
+          <span className="text-[6px] text-muted-foreground/40 leading-none">+{events.length - 3}</span>
         )}
       </div>
     );
   }
 
-  /* ── Single event: clean colored block ── */
+  /* ── Single event: clean centered colored square ── */
   const first = events[0];
   const color = STATUS_COLORS[first.status];
   const hasTime = !!(first.startTime && first.endTime);
@@ -1059,15 +1054,15 @@ function GridCell({
           ref.current && onEventClick(first, ref.current.getBoundingClientRect());
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
-        className={`relative w-full h-full min-h-[30px] flex items-center justify-center cursor-grab active:cursor-grabbing group/ev rounded transition-all hover:brightness-110 select-none
-          ${copiedEventId === first.id ? "ring-1 ring-sky-400/60 ring-offset-1 ring-offset-background" : ""}`}>
+        className={`relative w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing group/ev transition-all hover:brightness-110 select-none
+          ${copiedEventId === first.id ? "outline outline-1 outline-sky-400/60" : ""}`}>
         <div
-          className="w-[22px] h-[22px] rounded-[3px] flex-shrink-0 transition-all group-hover/ev:scale-105 group-hover/ev:shadow-md"
-          style={{ backgroundColor: color, opacity: first.done ? 0.4 : 0.88 }}
+          className="w-[18px] h-[18px] rounded-[3px] flex-shrink-0 transition-all group-hover/ev:scale-110 group-hover/ev:shadow-lg group-hover/ev:shadow-black/40"
+          style={{ backgroundColor: color, opacity: first.done ? 0.35 : 0.85 }}
         />
         {first.done && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <Check className="w-2.5 h-2.5 text-white drop-shadow" style={{ opacity: 0.9 }}/>
+            <Check className="w-2 h-2 text-white drop-shadow" style={{ opacity: 0.9 }}/>
           </div>
         )}
       </div>

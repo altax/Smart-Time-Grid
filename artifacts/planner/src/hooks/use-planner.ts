@@ -22,7 +22,54 @@ function pickColor(i: number) { return ENTITY_PALETTE[i % ENTITY_PALETTE.length]
 export function usePlanner(currentMonth: Date) {
   const eventsKey = getEventsKey(currentMonth);
 
-  const [entities, setEntities] = useState<Entity[]>(() => load<Entity[]>(ENTITIES_KEY, []));
+  const [entities, setEntities] = useState<Entity[]>(() => {
+    const saved = load<Entity[]>(ENTITIES_KEY, []);
+    if (saved.length > 0) return saved;
+    const m = format(new Date(), "yyyy-MM");
+    const demo: Entity[] = [
+      { id: "demo-1", name: "Ресторан Центр",  color: ENTITY_PALETTE[0] },
+      { id: "demo-2", name: "Ресторан Север",  color: ENTITY_PALETTE[1] },
+      { id: "demo-3", name: "Ресторан Запад",  color: ENTITY_PALETTE[4] },
+      { id: "demo-4", name: "Ресторан Юг",     color: ENTITY_PALETTE[8] },
+      { id: "demo-5", name: "Ресторан Восток", color: ENTITY_PALETTE[2] },
+      { id: "demo-6", name: "PH SPB Kolpino",  color: ENTITY_PALETTE[3] },
+      { id: "demo-7", name: "PH SPB Chkalovski", color: ENTITY_PALETTE[5] },
+      { id: "demo-8", name: "PH SPB Gorohovaya", color: ENTITY_PALETTE[6] },
+    ];
+    const evts: PlannerEvent[] = [
+      { id:"de1",  entityId:"demo-1", date:`${m}-03`, status:"confirmed", title:"Плановый выезд",        assignee:"Иванов И.",   startTime:"09:00", endTime:"11:30", earnings:3500 },
+      { id:"de2",  entityId:"demo-1", date:`${m}-07`, status:"overdue",   title:"Проверка оборудования", assignee:"Петров А.",   startTime:"14:00", endTime:"16:00", earnings:2800 },
+      { id:"de3",  entityId:"demo-1", date:`${m}-14`, status:"pending",   title:"Обучение персонала",    assignee:"Сидорова М.", startTime:"10:00", endTime:"13:00", earnings:4200 },
+      { id:"de4",  entityId:"demo-1", date:`${m}-21`, status:"confirmed", title:"Сервис",                assignee:"Козлов Р.",   earnings:2100 },
+      { id:"de5",  entityId:"demo-2", date:`${m}-02`, status:"confirmed", title:"Плановый выезд",        assignee:"Козлов Р.",   startTime:"08:30", endTime:"10:00", earnings:1800 },
+      { id:"de6",  entityId:"demo-2", date:`${m}-09`, status:"pending",   title:"Замена фильтров",       assignee:"Иванов И.",   startTime:"11:00", endTime:"12:30", earnings:2200 },
+      { id:"de7",  entityId:"demo-2", date:`${m}-18`, status:"confirmed", title:"Сервисное ТО",          assignee:"Петров А.",   startTime:"15:00", endTime:"17:30", earnings:5000 },
+      { id:"de8",  entityId:"demo-2", date:`${m}-25`, status:"overdue",   title:"Обработка",             assignee:"Сидорова М.", earnings:3200 },
+      { id:"de9",  entityId:"demo-3", date:`${m}-05`, status:"overdue",   title:"Проверка оборудования", assignee:"Сидорова М.", startTime:"09:00", endTime:"10:30", earnings:1500 },
+      { id:"de10", entityId:"demo-3", date:`${m}-12`, status:"confirmed", title:"Плановый выезд",        assignee:"Козлов Р.",   startTime:"13:00", endTime:"15:00", earnings:3200 },
+      { id:"de11", entityId:"demo-3", date:`${m}-20`, status:"pending",   title:"Замена расходников",    assignee:"Иванов И.",   earnings:2000 },
+      { id:"de12", entityId:"demo-3", date:`${m}-28`, status:"confirmed", title:"Ревизия",               assignee:"Петров А.",   earnings:1800 },
+      { id:"de13", entityId:"demo-4", date:`${m}-06`, status:"pending",   title:"Плановый выезд",        assignee:"Петров А.",   startTime:"08:00", endTime:"10:00", earnings:2400 },
+      { id:"de14", entityId:"demo-4", date:`${m}-15`, status:"confirmed", title:"Сервисное ТО",          assignee:"Сидорова М.", startTime:"14:00", endTime:"16:45", earnings:4800, done:true },
+      { id:"de15", entityId:"demo-4", date:`${m}-22`, status:"overdue",   title:"Проверка",              assignee:"Козлов Р.",   startTime:"10:00", endTime:"11:00", earnings:1200 },
+      { id:"de16", entityId:"demo-5", date:`${m}-04`, status:"pending",   title:"Выезд",                 assignee:"Иванов И.",   earnings:2600 },
+      { id:"de17", entityId:"demo-5", date:`${m}-11`, status:"confirmed", title:"Обработка",             assignee:"Петров А.",   earnings:3100 },
+      { id:"de18", entityId:"demo-5", date:`${m}-19`, status:"overdue",   title:"Ревизия",               assignee:"Сидорова М.", earnings:1700 },
+      { id:"de19", entityId:"demo-5", date:`${m}-26`, status:"pending",   title:"Сервис",                assignee:"Козлов Р.",   earnings:2900 },
+      { id:"de20", entityId:"demo-6", date:`${m}-03`, status:"overdue",   title:"Запланирован выезд",    assignee:"Иванов И.",   earnings:3800 },
+      { id:"de21", entityId:"demo-6", date:`${m}-10`, status:"confirmed", title:"Обработка",             assignee:"Петров А.",   earnings:2100 },
+      { id:"de22", entityId:"demo-6", date:`${m}-17`, status:"pending",   title:"Проверка",              assignee:"Сидорова М.", earnings:1500 },
+      { id:"de23", entityId:"demo-7", date:`${m}-08`, status:"confirmed", title:"Выезд",                 assignee:"Козлов Р.",   earnings:3300 },
+      { id:"de24", entityId:"demo-7", date:`${m}-16`, status:"overdue",   title:"Сервис",                assignee:"Иванов И.",   earnings:2700 },
+      { id:"de25", entityId:"demo-7", date:`${m}-24`, status:"pending",   title:"ТО",                    assignee:"Петров А.",   earnings:1900 },
+      { id:"de26", entityId:"demo-8", date:`${m}-07`, status:"pending",   title:"Выезд",                 assignee:"Сидорова М.", earnings:2500 },
+      { id:"de27", entityId:"demo-8", date:`${m}-13`, status:"confirmed", title:"Обработка",             assignee:"Козлов Р.",   earnings:3600 },
+      { id:"de28", entityId:"demo-8", date:`${m}-23`, status:"overdue",   title:"Ревизия",               assignee:"Иванов И.",   earnings:1100 },
+    ];
+    try { localStorage.setItem(ENTITIES_KEY, JSON.stringify(demo)); } catch { /* ignore */ }
+    try { localStorage.setItem(getEventsKey(new Date()), JSON.stringify(evts)); } catch { /* ignore */ }
+    return demo;
+  });
   const [events,   setEvents]   = useState<PlannerEvent[]>([]);
   const [goals,    setGoals]    = useState<Goal[]>(() => load<Goal[]>(GOALS_KEY, []));
 

@@ -45,31 +45,34 @@
 }
 
 :root {
-  --background: 232 28% 8%;
-  --foreground: 220 15% 82%;
-  --border: 232 20% 16%;
-  --input: 232 20% 16%;
-  --ring: 220 90% 60%;
+  /* Deep warm navy — matched to reference pixel colors */
+  --background: 236 38% 10%;
+  --foreground: 220 12% 78%;
+  --border: 234 26% 21%;
+  --input: 234 26% 21%;
+  --ring: 0 68% 62%;
 
-  --card: 232 25% 11%;
-  --card-foreground: 220 15% 82%;
-  --card-border: 232 20% 17%;
+  --card: 235 32% 13%;
+  --card-foreground: 220 12% 78%;
+  --card-border: 234 24% 18%;
 
-  --popover: 232 26% 13%;
-  --popover-foreground: 220 15% 88%;
-  --popover-border: 232 20% 20%;
+  --popover: 235 34% 15%;
+  --popover-foreground: 220 12% 84%;
+  --popover-border: 234 24% 22%;
 
-  --primary: 220 90% 60%;
+  /* Primary = coral (matches today-circle & overdue in reference) */
+  --primary: 0 68% 62%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 232 20% 14%;
-  --secondary-foreground: 220 15% 75%;
+  --secondary: 234 26% 16%;
+  --secondary-foreground: 220 10% 68%;
 
-  --muted: 232 20% 12%;
-  --muted-foreground: 220 10% 48%;
+  --muted: 234 28% 12%;
+  --muted-foreground: 220 8% 44%;
 
-  --accent: 232 20% 18%;
-  --accent-foreground: 220 15% 82%;
+  /* Accent used as empty-cell fill */
+  --accent: 234 28% 16%;
+  --accent-foreground: 220 12% 78%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
@@ -77,35 +80,35 @@
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.375rem;
+  --radius: 0.25rem;
 }
 
 .dark {
-  --background: 232 28% 8%;
-  --foreground: 220 15% 82%;
-  --border: 232 20% 16%;
-  --input: 232 20% 16%;
-  --ring: 220 90% 60%;
+  --background: 236 38% 10%;
+  --foreground: 220 12% 78%;
+  --border: 234 26% 21%;
+  --input: 234 26% 21%;
+  --ring: 0 68% 62%;
 
-  --card: 232 25% 11%;
-  --card-foreground: 220 15% 82%;
-  --card-border: 232 20% 17%;
+  --card: 235 32% 13%;
+  --card-foreground: 220 12% 78%;
+  --card-border: 234 24% 18%;
 
-  --popover: 232 26% 13%;
-  --popover-foreground: 220 15% 88%;
-  --popover-border: 232 20% 20%;
+  --popover: 235 34% 15%;
+  --popover-foreground: 220 12% 84%;
+  --popover-border: 234 24% 22%;
 
-  --primary: 220 90% 60%;
+  --primary: 0 68% 62%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 232 20% 14%;
-  --secondary-foreground: 220 15% 75%;
+  --secondary: 234 26% 16%;
+  --secondary-foreground: 220 10% 68%;
 
-  --muted: 232 20% 12%;
-  --muted-foreground: 220 10% 48%;
+  --muted: 234 28% 12%;
+  --muted-foreground: 220 8% 44%;
 
-  --accent: 232 20% 18%;
-  --accent-foreground: 220 15% 82%;
+  --accent: 234 28% 16%;
+  --accent-foreground: 220 12% 78%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
@@ -122,10 +125,10 @@
 }
 
 .cell-sq {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 3px;
   flex-shrink: 0;
 }
 

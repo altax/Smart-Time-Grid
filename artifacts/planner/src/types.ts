@@ -41,8 +41,8 @@ export interface Goal {
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {
-  overdue:   "#f43f5e",
-  confirmed: "#10b981",
+  overdue:   "#f06060",
+  confirmed: "#3dd68c",
   pending:   "#f59e0b",
 };
 
