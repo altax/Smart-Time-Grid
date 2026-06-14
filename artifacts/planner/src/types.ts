@@ -1,4 +1,4 @@
-export type EventStatus = "overdue" | "confirmed" | "pending";
+export type EventStatus = "confirmed" | "pending";
 
 export interface Entity {
   id: string;
@@ -41,24 +41,21 @@ export interface Goal {
 }
 
 export const STATUS_COLORS: Record<EventStatus, string> = {
-  overdue:   "#f06060",
   confirmed: "#3dd68c",
   pending:   "#f59e0b",
 };
 
 export const STATUS_GRADIENTS: Record<EventStatus, string> = {
-  overdue:   "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
   confirmed: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
   pending:   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
 };
 
 export const STATUS_LABELS: Record<EventStatus, string> = {
-  overdue:   "Просрочено",
   confirmed: "Подтверждено",
   pending:   "Ожидание",
 };
 
-export const STATUS_CYCLE: EventStatus[] = ["pending", "confirmed", "overdue"];
+export const STATUS_CYCLE: EventStatus[] = ["pending", "confirmed"];
 
 export const ENTITY_PALETTE = [
   "#6366f1","#3b82f6","#0ea5e9","#06b6d4","#14b8a6",

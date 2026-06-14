@@ -338,7 +338,6 @@ export default function Home() {
   const FILLED_COLORS: Record<string, string> = {
     confirmed: "#1a7f37",
     pending:   "#9e6a03",
-    overdue:   "#b91c1c",
   };
 
   return (
@@ -383,15 +382,64 @@ export default function Home() {
         {/* Divider */}
         <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 20px" }}/>
 
+        {/* Stats */}
+        {(() => {
+          const confirmed  = events.filter(e => e.status === "confirmed").length;
+          const pending    = events.filter(e => e.status === "pending").length;
+          const total      = events.length;
+          const totalEarn  = events.reduce((s, e) => s + (e.earnings ?? 0), 0);
+          return (
+            <div style={{ padding: "0 18px 20px" }}>
+              <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>Месяц</p>
+
+              {/* Big earnings figure */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "rgba(230,237,243,0.85)", lineHeight: 1 }}>
+                  {totalEarn >= 1000
+                    ? `${(totalEarn / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} к₽`
+                    : `${totalEarn} ₽`}
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(230,237,243,0.3)", marginTop: 3 }}>фонд оплаты труда</div>
+              </div>
+
+              {/* Shift counts */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div style={{ background: "#0d1117", borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#3dd68c", lineHeight: 1 }}>{confirmed}</div>
+                  <div style={{ fontSize: 9, color: "rgba(230,237,243,0.3)", marginTop: 3 }}>подтверждено</div>
+                </div>
+                <div style={{ background: "#0d1117", borderRadius: 6, padding: "8px 10px" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#f59e0b", lineHeight: 1 }}>{pending}</div>
+                  <div style={{ fontSize: 9, color: "rgba(230,237,243,0.3)", marginTop: 3 }}>ожидание</div>
+                </div>
+              </div>
+
+              {total > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {/* Progress bar */}
+                  <div style={{ height: 3, borderRadius: 2, background: "#21262d", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.round((confirmed / total) * 100)}%`, background: "#1a7f37", borderRadius: 2, transition: "width 0.3s" }}/>
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(230,237,243,0.25)", marginTop: 4 }}>
+                    {Math.round((confirmed / total) * 100)}% подтверждено
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Divider */}
+        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
+
         {/* Legend */}
         <div style={{ padding: "0 18px" }}>
-          <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>Статус</p>
+          <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Статус</p>
           {[
             { label: "Подтверждено", color: "#1a7f37" },
             { label: "Ожидание",     color: "#9e6a03"  },
-            { label: "Просрочено",   color: "#b91c1c"  },
           ].map(({ label, color }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0, display: "inline-block" }}/>
               <span style={{ fontSize: 11, color: "rgba(230,237,243,0.5)" }}>{label}</span>
             </div>
@@ -418,7 +466,10 @@ export default function Home() {
         <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "4px", backgroundColor: BG }}>
           <colgroup>
             <col style={{ width: 190, minWidth: 190 }}/>
-            {days.map(d => <col key={d.toISOString()} style={{ width: 22, minWidth: 22 }}/>)}
+            {days.map(d => {
+              const isMon = d.getDay() === 1;
+              return <col key={d.toISOString()} style={{ width: isMon ? 30 : 22, minWidth: isMon ? 30 : 22 }}/>;
+            })}
           </colgroup>
 
           <thead className="sticky top-0 z-20" style={{ backgroundColor: BG }}>
@@ -430,28 +481,41 @@ export default function Home() {
               {days.map(day => {
                 const tod = isToday(day), wknd = isWeekend(day);
                 const isWeekStart = day.getDay() === 1;
+                const DAY_SHORT = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
                 return (
                   <th key={day.toISOString()}
                     ref={tod ? todayThRef : undefined}
-                    className="text-center align-bottom"
+                    className="text-center"
                     style={{
                       background: "transparent",
                       paddingBottom: 4,
                       paddingTop: 0,
-                      paddingLeft: isWeekStart ? 5 : 0,
+                      paddingLeft: isWeekStart ? 8 : 0,
+                      verticalAlign: "bottom",
                     }}>
-                    <span
-                      className="flex items-center justify-center mx-auto rounded-sm leading-none"
-                      style={{
-                        fontSize: 9,
-                        fontWeight: tod ? 700 : 500,
-                        width: 18,
-                        height: 18,
-                        backgroundColor: tod ? "#238636" : "transparent",
-                        color: tod ? "#fff" : wknd ? "rgba(230,237,243,0.22)" : "rgba(230,237,243,0.45)",
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                      <span style={{
+                        fontSize: 7,
+                        fontWeight: 500,
+                        color: wknd ? "rgba(230,237,243,0.2)" : "rgba(230,237,243,0.28)",
+                        lineHeight: 1,
+                        letterSpacing: "0.02em",
                       }}>
-                      {format(day, "d")}
-                    </span>
+                        {DAY_SHORT[day.getDay()]}
+                      </span>
+                      <span
+                        className="flex items-center justify-center mx-auto rounded-sm leading-none"
+                        style={{
+                          fontSize: 9,
+                          fontWeight: tod ? 700 : 500,
+                          width: 18,
+                          height: 18,
+                          backgroundColor: tod ? "#238636" : "transparent",
+                          color: tod ? "#fff" : wknd ? "rgba(230,237,243,0.22)" : "rgba(230,237,243,0.45)",
+                        }}>
+                        {format(day, "d")}
+                      </span>
+                    </div>
                   </th>
                 );
               })}
@@ -741,7 +805,6 @@ function EntityRow({
         const STATUS_FILL: Record<string, string> = {
           confirmed: "#1a7f37",
           pending:   "#9e6a03",
-          overdue:   "#b91c1c",
         };
         const filledColor = isDragTarget
           ? "rgba(35,134,54,0.35)"
