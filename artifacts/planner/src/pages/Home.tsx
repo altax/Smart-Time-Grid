@@ -415,10 +415,10 @@ export default function Home() {
       {/* ─────────────── Main area ─────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div ref={gridRef} style={{ flex: 1, overflow: "auto", padding: "22px 24px 16px", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
-        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: BG }}>
+        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "4px", backgroundColor: BG }}>
           <colgroup>
-            <col style={{ width: 148, minWidth: 148 }}/>
-            {days.map(d => <col key={d.toISOString()} style={{ width: 16, minWidth: 16 }}/>)}
+            <col style={{ width: 190, minWidth: 190 }}/>
+            {days.map(d => <col key={d.toISOString()} style={{ width: 22, minWidth: 22 }}/>)}
           </colgroup>
 
           <thead className="sticky top-0 z-20" style={{ backgroundColor: BG }}>
@@ -443,12 +443,12 @@ export default function Home() {
                     <span
                       className="flex items-center justify-center mx-auto rounded-sm leading-none"
                       style={{
-                        fontSize: 8,
+                        fontSize: 9,
                         fontWeight: tod ? 700 : 500,
-                        width: 14,
-                        height: 14,
+                        width: 18,
+                        height: 18,
                         backgroundColor: tod ? "#238636" : "transparent",
-                        color: tod ? "#fff" : wknd ? "rgba(230,237,243,0.2)" : "rgba(230,237,243,0.4)",
+                        color: tod ? "#fff" : wknd ? "rgba(230,237,243,0.22)" : "rgba(230,237,243,0.45)",
                       }}>
                       {format(day, "d")}
                     </span>
@@ -505,7 +505,7 @@ export default function Home() {
               {showAddRow ? (
                 <tr>
                   {/* Input only in entity column */}
-                  <td style={{ background: BG, borderRadius: 0, padding: "3px 4px", height: "16px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
+                  <td style={{ background: BG, borderRadius: 0, padding: "3px 6px", height: "22px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                       <input ref={addRowRef} data-testid="input-new-entity"
                         value={newEntityName}
@@ -531,24 +531,13 @@ export default function Home() {
                     <td key={format(day, "yyyy-MM-dd")}
                       style={{
                         backgroundColor: isWeekend(day) ? CELL_EMPTY_WE : CELL_EMPTY_WD,
-                        borderRadius: "2px",
-                        height: "16px",
-                        width: "16px",
+                        borderRadius: "3px",
+                        height: "22px",
+                        width: "22px",
                       }}/>
                   ))}
                 </tr>
-              ) : (
-                <tr>
-                  <td colSpan={days.length + 1}
-                    onClick={() => setShowAddRow(true)}
-                    style={{ background: "transparent", borderRadius: 0, padding: "6px 4px", cursor: "pointer" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <Plus style={{ width: 9, height: 9, color: "rgba(230,237,243,0.2)" }}/>
-                      <span style={{ fontSize: 10, color: "rgba(230,237,243,0.2)", fontWeight: 500 }}>Добавить объект</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
+              ) : null}
             </tbody>
           </table>
       </div>{/* end gridRef / main scroll area */}
@@ -703,9 +692,9 @@ function EntityRow({
   return (
     <tr>
       {/* Entity name — sticky left column */}
-      <td style={{ background: "#0d1117", borderRadius: 0, padding: "0 6px 0 4px", height: "16px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
-          <span style={{ width: 4, height: 4, borderRadius: "50%", backgroundColor: entity.color, flexShrink: 0, display: "inline-block", opacity: 0.7 }}/>
+      <td style={{ background: "#0d1117", borderRadius: 0, padding: "0 8px 0 4px", height: "22px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <span style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: entity.color, flexShrink: 0, display: "inline-block", opacity: 0.75 }}/>
           {editing ? (
             <input ref={inputRef} value={editName}
               onChange={e => setEditName(e.target.value)}
@@ -714,12 +703,12 @@ function EntityRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
               }}
-              style={{ flex: 1, fontSize: 11, background: "transparent", outline: "none", borderBottom: "1px solid #238636", color: "rgba(230,237,243,0.85)", minWidth: 0 }}/>
+              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: "1px solid #238636", color: "rgba(230,237,243,0.9)", minWidth: 0 }}/>
           ) : (
             <span
               onDoubleClick={() => setEditing(true)}
               title={entity.name}
-              style={{ fontSize: 11, fontWeight: 400, color: "rgba(230,237,243,0.65)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, cursor: "default", letterSpacing: "0.01em" }}>
+              style={{ fontSize: 12, fontWeight: 400, color: "rgba(230,237,243,0.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, cursor: "default", letterSpacing: "0.01em" }}>
               {entity.name}
             </span>
           )}
@@ -762,14 +751,14 @@ function EntityRow({
           <td key={dateStr}
             style={{
               backgroundColor: filledColor,
-              borderRadius: "2px",
+              borderRadius: "3px",
               padding: 0,
-              height: "16px",
-              width: "16px",
+              height: "22px",
+              width: "22px",
               verticalAlign: "middle",
               opacity: (firstEv?.done && !isDragTarget) ? 0.35 : 1,
               transition: "background-color 0.08s, opacity 0.08s",
-              paddingLeft: isWeekStart ? 3 : 0,
+              paddingLeft: isWeekStart ? 4 : 0,
               position: "relative",
             }}
             onDragOver={e => onDragOver(key, e)}
