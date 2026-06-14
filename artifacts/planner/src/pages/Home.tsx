@@ -341,13 +341,13 @@ export default function Home() {
         <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: "#1b1d2f" }}>
           <colgroup>
             <col style={{ width: 160, minWidth: 160 }}/>
-            {days.map(d => <col key={d.toISOString()} style={{ width: 52, minWidth: 52 }}/>)}
+            {days.map(d => <col key={d.toISOString()} style={{ width: 38, minWidth: 38 }}/>)}
           </colgroup>
 
           <thead className="sticky top-0 z-20" style={{ backgroundColor: "#1b1d2f" }}>
             <tr>
               {/* "Ресторан" + embedded month nav */}
-              <th className="px-4 py-3 text-left align-middle" style={{ background: "transparent" }}>
+              <th className="px-4 py-3 text-left align-middle" style={{ background: "#1b1d2f", position: "sticky", left: 0, zIndex: 30 }}>
                 <div className="flex items-center justify-between min-w-0">
                   <span className="text-[11px] font-medium" style={{ color: "rgba(255,255,255,0.38)" }}>Ресторан</span>
                   <div className="flex items-center gap-0.5">
@@ -476,11 +476,11 @@ export default function Home() {
                   {days.map(day => (
                     <td key={format(day, "yyyy-MM-dd")}
                       style={{
-                        backgroundColor: isWeekend(day) ? "#121224" : "#141626",
+                        backgroundColor: isWeekend(day) ? "#191b2c" : "#1e2035",
                         borderRadius: "4px",
-                        height: "52px",
-                        width: "52px",
-                        borderLeft: day.getDay() === 1 ? "2px solid rgba(255,255,255,0.18)" : undefined,
+                        height: "38px",
+                        width: "38px",
+                        borderLeft: day.getDay() === 1 ? "2px solid rgba(255,255,255,0.12)" : undefined,
                       }}/>
                   ))}
                 </tr>
@@ -660,8 +660,8 @@ function EntityRow({
 
   return (
     <tr>
-      {/* Entity name — transparent, no tile effect */}
-      <td style={{ background: "transparent", borderRadius: 0, padding: "0 12px", height: "52px", verticalAlign: "middle" }}>
+      {/* Entity name — sticky left column */}
+      <td style={{ background: "#1b1d2f", borderRadius: 0, padding: "0 10px", height: "38px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
           <span style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: entity.color, flexShrink: 0, display: "inline-block" }}/>
           {editing ? (
@@ -706,25 +706,25 @@ function EntityRow({
         const key = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
         const firstEv = cellEvents[0];
-        const emptyColor = wknd ? "#121224" : "#141626";
-        const tileColor = isDragTarget
-          ? "rgba(240,96,96,0.3)"
-          : firstEv
-            ? STATUS_COLORS[firstEv.status]
-            : emptyColor;
+        const emptyColor = wknd ? "#191b2c" : "#1e2035";
+        const filledColor = isDragTarget
+          ? "rgba(240,96,96,0.18)"
+          : firstEv ? "#252840" : emptyColor;
+        const statusBorderColor = firstEv ? STATUS_COLORS[firstEv.status] : undefined;
         const isWeekStart = day.getDay() === 1;
         return (
           <td key={dateStr}
             style={{
-              backgroundColor: tileColor,
+              backgroundColor: filledColor,
               borderRadius: "4px",
               padding: 0,
-              height: "52px",
-              width: "52px",
-              verticalAlign: "middle",
-              opacity: (firstEv?.done && !isDragTarget) ? 0.35 : 1,
+              height: "38px",
+              width: "38px",
+              verticalAlign: "top",
+              opacity: (firstEv?.done && !isDragTarget) ? 0.4 : 1,
               transition: "background-color 0.1s",
-              borderLeft: isWeekStart ? "2px solid rgba(255,255,255,0.18)" : undefined,
+              borderLeft: isWeekStart ? "2px solid rgba(255,255,255,0.12)" : undefined,
+              boxShadow: statusBorderColor ? `inset 0 2px 0 0 ${statusBorderColor}` : undefined,
             }}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}
@@ -1046,7 +1046,13 @@ function GridCell({
   /* ── Single event — td is the status-colored tile, this is just interaction ── */
   const first = events[0];
   const hasTime = !!(first.startTime && first.endTime);
-  const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "12ч";
+  const durMins = hasTime ? calcDurationMins(first.startTime!, first.endTime!) : 720;
+  const durCompact = (() => {
+    const h = Math.floor(durMins / 60), m = durMins % 60;
+    if (h === 0) return `${m}м`;
+    if (m === 0) return `${h}ч`;
+    return `${h}.${Math.round(m / 6)}ч`;
+  })();
   const earn = first.earnings ?? 0;
   const assigneeShort = first.assignee && first.assignee !== "—"
     ? first.assignee.split(" ")[0]
@@ -1068,26 +1074,26 @@ function GridCell({
         }}
         onContextMenu={e => onContextMenu(e.nativeEvent, first)}
         style={{
-          width: "100%", height: "100%",
+          width: "100%", height: "38px",
           cursor: "grab",
           transition: "filter 0.1s",
-          outline: copiedEventId === first.id ? "1px solid rgba(125,211,252,0.6)" : "none",
+          outline: copiedEventId === first.id ? "1px solid rgba(125,211,252,0.5)" : "none",
           outlineOffset: "-1px",
           display: "flex", flexDirection: "column",
           alignItems: "center", justifyContent: "center",
-          padding: "3px 2px", overflow: "hidden", gap: "1px",
+          padding: "4px 2px 3px", overflow: "hidden", gap: "1px",
         }}
       >
         {assigneeShort && (
-          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.95)", fontWeight: 700, lineHeight: 1.1, textAlign: "center", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.9)", fontWeight: 700, lineHeight: 1, textAlign: "center", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
             {assigneeShort}
           </span>
         )}
-        <span style={{ fontSize: 8, color: "rgba(255,255,255,0.72)", lineHeight: 1.1, fontWeight: 500 }}>
-          {dur}
+        <span style={{ fontSize: 7, color: "rgba(255,255,255,0.45)", lineHeight: 1, fontWeight: 500 }}>
+          {durCompact}
         </span>
         {earn > 0 && (
-          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.9)", fontWeight: 700, lineHeight: 1.1 }}>
+          <span style={{ fontSize: 7, color: "rgba(255,255,255,0.7)", fontWeight: 700, lineHeight: 1 }}>
             {earn >= 1000 ? `${Math.round(earn / 1000)}к₽` : `${earn}₽`}
           </span>
         )}
