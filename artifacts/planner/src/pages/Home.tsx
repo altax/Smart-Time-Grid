@@ -350,6 +350,9 @@ export default function Home() {
         borderRight: "1px solid #21262d",
         display: "flex", flexDirection: "column",
         padding: "22px 0 16px",
+        overflowY: "auto",
+        scrollbarWidth: "thin",
+        scrollbarColor: "rgba(255,255,255,0.06) transparent",
       }}>
         {/* App title */}
         <div style={{ padding: "0 18px 22px" }}>
@@ -432,6 +435,76 @@ export default function Home() {
         {/* Divider */}
         <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
 
+        {/* Upcoming shifts */}
+        {(() => {
+          const todayStr = format(new Date(), "yyyy-MM-dd");
+          const upcoming = events
+            .filter(e => e.date >= todayStr && e.status === "pending")
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .slice(0, 3);
+          const entityName = (id: string) => entities.find(e => e.id === id)?.name ?? "—";
+          return (
+            <div style={{ padding: "0 18px 18px" }}>
+              <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Ближайшие смены</p>
+              {upcoming.length === 0 ? (
+                <p style={{ fontSize: 10, color: "rgba(230,237,243,0.2)" }}>Нет запланированных</p>
+              ) : upcoming.map(ev => {
+                const d = parseISO(ev.date);
+                return (
+                  <div key={ev.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                    <div style={{ flexShrink: 0, textAlign: "center", background: "#21262d", borderRadius: 5, padding: "3px 5px", minWidth: 28 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(230,237,243,0.8)", lineHeight: 1 }}>{format(d, "d")}</div>
+                      <div style={{ fontSize: 8, color: "rgba(230,237,243,0.3)", lineHeight: 1, marginTop: 1 }}>{["вс","пн","вт","ср","чт","пт","сб"][d.getDay()]}</div>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: "rgba(230,237,243,0.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {entityName(ev.entityId)}
+                      </div>
+                      {ev.assignee && ev.assignee !== "—" && (
+                        <div style={{ fontSize: 10, color: "rgba(230,237,243,0.35)", marginTop: 1 }}>{ev.assignee}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Divider */}
+        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
+
+        {/* Staff list */}
+        {(() => {
+          const map: Record<string, number> = {};
+          events.forEach(e => {
+            if (e.assignee && e.assignee !== "—") map[e.assignee] = (map[e.assignee] ?? 0) + 1;
+          });
+          const staff = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+          const max = staff[0]?.[1] ?? 1;
+          return (
+            <div style={{ padding: "0 18px 18px" }}>
+              <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Сотрудники</p>
+              {staff.length === 0 ? (
+                <p style={{ fontSize: 10, color: "rgba(230,237,243,0.2)" }}>Нет данных</p>
+              ) : staff.map(([name, cnt]) => (
+                <div key={name} style={{ marginBottom: 7 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
+                    <span style={{ fontSize: 11, color: "rgba(230,237,243,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{name}</span>
+                    <span style={{ fontSize: 10, color: "rgba(230,237,243,0.3)", flexShrink: 0, marginLeft: 4 }}>{cnt}</span>
+                  </div>
+                  <div style={{ height: 2, borderRadius: 1, background: "#21262d" }}>
+                    <div style={{ height: "100%", width: `${(cnt / max) * 100}%`, background: "#1a7f37", borderRadius: 1 }}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Divider */}
+        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
+
         {/* Legend */}
         <div style={{ padding: "0 18px" }}>
           <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Статус</p>
@@ -462,14 +535,21 @@ export default function Home() {
 
       {/* ─────────────── Main area ─────────────── */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div ref={gridRef} style={{ flex: 1, overflow: "auto", padding: "22px 24px 16px", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
-        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "4px", backgroundColor: BG }}>
+
+        {/* ── Top free zone (future: panels, KPIs, day view) ── */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: 11, color: "rgba(230,237,243,0.07)", letterSpacing: "0.06em", textTransform: "uppercase", userSelect: "none" }}>
+            Область для будущих панелей
+          </span>
+        </div>
+
+        {/* ── Grid — full width, pinned to bottom ── */}
+        <div style={{ borderTop: "1px solid #21262d" }}/>
+      <div ref={gridRef} style={{ overflow: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
+        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "4px", backgroundColor: BG, width: "100%" }}>
           <colgroup>
             <col style={{ width: 190, minWidth: 190 }}/>
-            {days.map(d => {
-              const isMon = d.getDay() === 1;
-              return <col key={d.toISOString()} style={{ width: isMon ? 30 : 22, minWidth: isMon ? 30 : 22 }}/>;
-            })}
+            {days.map(d => <col key={d.toISOString()}/>)}
           </colgroup>
 
           <thead className="sticky top-0 z-20" style={{ backgroundColor: BG }}>
@@ -490,7 +570,8 @@ export default function Home() {
                       background: "transparent",
                       paddingBottom: 4,
                       paddingTop: 0,
-                      paddingLeft: isWeekStart ? 8 : 0,
+                      paddingLeft: 0,
+                      borderLeft: isWeekStart ? "4px solid #0d1117" : undefined,
                       verticalAlign: "bottom",
                     }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
@@ -817,11 +898,10 @@ function EntityRow({
               borderRadius: "3px",
               padding: 0,
               height: "22px",
-              width: "22px",
               verticalAlign: "middle",
               opacity: (firstEv?.done && !isDragTarget) ? 0.35 : 1,
               transition: "background-color 0.08s, opacity 0.08s",
-              paddingLeft: isWeekStart ? 4 : 0,
+              borderLeft: isWeekStart ? "4px solid #0d1117" : undefined,
               position: "relative",
             }}
             onDragOver={e => onDragOver(key, e)}
