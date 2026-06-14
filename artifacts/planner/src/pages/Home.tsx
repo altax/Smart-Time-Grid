@@ -342,11 +342,79 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-foreground" style={{ backgroundColor: BG }}>
+    <div className="flex text-foreground" style={{ backgroundColor: BG, height: "100vh", overflow: "hidden" }}>
 
-      {/* ── Grid centered ── */}
-      <div className="flex justify-center py-10 px-6">
-      <div ref={gridRef} className="overflow-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
+      {/* ─────────────── Sidebar ─────────────── */}
+      <aside style={{
+        width: 210, flexShrink: 0,
+        backgroundColor: "#161b22",
+        borderRight: "1px solid #21262d",
+        display: "flex", flexDirection: "column",
+        padding: "22px 0 16px",
+      }}>
+        {/* App title */}
+        <div style={{ padding: "0 18px 22px" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(230,237,243,0.55)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Планировщик смен
+          </span>
+        </div>
+
+        {/* Month nav */}
+        <div style={{ padding: "0 14px 22px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+            <button data-testid="btn-prev-month"
+              onClick={() => setCurrentMonth(m => subMonths(m, 1))}
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid #30363d", background: "transparent", cursor: "pointer", color: "rgba(230,237,243,0.4)", flexShrink: 0 }}>
+              <ChevronLeft className="w-3 h-3"/>
+            </button>
+            <button data-testid="btn-today"
+              onClick={() => setCurrentMonth(new Date())}
+              style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "rgba(230,237,243,0.85)", background: "transparent", border: "none", cursor: "pointer", textAlign: "center", padding: 0 }}>
+              {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            </button>
+            <button data-testid="btn-next-month"
+              onClick={() => setCurrentMonth(m => addMonths(m, 1))}
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid #30363d", background: "transparent", cursor: "pointer", color: "rgba(230,237,243,0.4)", flexShrink: 0 }}>
+              <ChevronRight className="w-3 h-3"/>
+            </button>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 20px" }}/>
+
+        {/* Legend */}
+        <div style={{ padding: "0 18px" }}>
+          <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>Статус</p>
+          {[
+            { label: "Подтверждено", color: "#1a7f37" },
+            { label: "Ожидание",     color: "#9e6a03"  },
+            { label: "Просрочено",   color: "#b91c1c"  },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 9 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0, display: "inline-block" }}/>
+              <span style={{ fontSize: 11, color: "rgba(230,237,243,0.5)" }}>{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div style={{ flex: 1 }}/>
+
+        {/* Add entity button */}
+        <div style={{ padding: "0 14px" }}>
+          <button
+            onClick={() => setShowAddRow(true)}
+            style={{ width: "100%", padding: "7px 12px", borderRadius: 6, backgroundColor: "#21262d", border: "1px solid #30363d", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "rgba(230,237,243,0.55)", fontSize: 11, fontWeight: 500 }}>
+            <Plus style={{ width: 10, height: 10 }}/>
+            Добавить объект
+          </button>
+        </div>
+      </aside>
+
+      {/* ─────────────── Main area ─────────────── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div ref={gridRef} style={{ flex: 1, overflow: "auto", padding: "22px 24px 16px", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
         <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: BG }}>
           <colgroup>
             <col style={{ width: 148, minWidth: 148 }}/>
@@ -355,31 +423,9 @@ export default function Home() {
 
           <thead className="sticky top-0 z-20" style={{ backgroundColor: BG }}>
             <tr>
-              {/* Entity column header + month nav */}
+              {/* Entity column header */}
               <th className="text-left align-middle pb-2" style={{ background: BG, position: "sticky", left: 0, zIndex: 30, paddingLeft: 4 }}>
-                <div className="flex items-center justify-between min-w-0">
-                  <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(230,237,243,0.4)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Объект</span>
-                  <div className="flex items-center gap-0.5 ml-2">
-                    <button data-testid="btn-prev-month"
-                      onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-                      className="w-4 h-4 flex items-center justify-center rounded hover:bg-white/8 transition-colors"
-                      style={{ color: "rgba(230,237,243,0.3)" }}>
-                      <ChevronLeft className="w-2.5 h-2.5"/>
-                    </button>
-                    <button data-testid="btn-today"
-                      onClick={() => setCurrentMonth(new Date())}
-                      className="text-[9px] px-1 rounded hover:bg-white/8 transition-colors whitespace-nowrap font-medium"
-                      style={{ color: "rgba(230,237,243,0.35)" }}>
-                      {MONTH_NAMES[currentMonth.getMonth()].slice(0, 3)} {currentMonth.getFullYear()}
-                    </button>
-                    <button data-testid="btn-next-month"
-                      onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-                      className="w-4 h-4 flex items-center justify-center rounded hover:bg-white/8 transition-colors"
-                      style={{ color: "rgba(230,237,243,0.3)" }}>
-                      <ChevronRight className="w-2.5 h-2.5"/>
-                    </button>
-                  </div>
-                </div>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(230,237,243,0.3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Объект</span>
               </th>
               {days.map(day => {
                 const tod = isToday(day), wknd = isWeekend(day);
@@ -505,23 +551,8 @@ export default function Home() {
               )}
             </tbody>
           </table>
-      </div>{/* end gridRef */}
-      </div>{/* end centering wrapper */}
-
-      {/* ── Legend footer ── */}
-      <div className="flex-shrink-0 flex items-center justify-center gap-5 py-4"
-        style={{ borderTop: "1px solid #21262d" }}>
-        {([
-          { label: "Подтверждено", color: "#1a7f37" },
-          { label: "Ожидание",     color: "#9e6a03" },
-          { label: "Просрочено",   color: "#b91c1c" },
-        ]).map(({ label, color }) => (
-          <div key={label} className="flex items-center gap-2">
-            <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, display: "inline-block", flexShrink: 0 }}/>
-            <span style={{ fontSize: 10, color: "rgba(230,237,243,0.4)", fontWeight: 500 }}>{label}</span>
-          </div>
-        ))}
-      </div>
+      </div>{/* end gridRef / main scroll area */}
+      </div>{/* end main area */}
 
       {/* ── Popup ── */}
       {popup && (
