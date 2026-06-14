@@ -333,17 +333,15 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden text-foreground" style={{ backgroundColor: "#1b1d2f" }}>
+    <div className="flex flex-col min-h-screen text-foreground" style={{ backgroundColor: "#1b1d2f" }}>
 
-      {/* ── Main area: grid + right sidebar ── */}
-      <div className="flex flex-1 min-h-0">
-
-      {/* ── Grid ── */}
-      <div ref={gridRef} className="flex-1 overflow-auto" style={{ scrollbarWidth: "none" }}>
-        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: "#1b1d2f", minWidth: "100%" }}>
+      {/* ── Grid centered ── */}
+      <div className="flex justify-center py-8 px-4">
+      <div ref={gridRef} className="overflow-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.08) transparent" }}>
+        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", backgroundColor: "#1b1d2f" }}>
           <colgroup>
-            <col style={{ width: 150, minWidth: 150 }}/>
-            {days.map(d => <col key={d.toISOString()} style={{ width: 24, minWidth: 24 }}/>)}
+            <col style={{ width: 160, minWidth: 160 }}/>
+            {days.map(d => <col key={d.toISOString()} style={{ width: 52, minWidth: 52 }}/>)}
           </colgroup>
 
           <thead className="sticky top-0 z-20" style={{ backgroundColor: "#1b1d2f" }}>
@@ -376,22 +374,27 @@ export default function Home() {
               </th>
               {days.map(day => {
                 const tod = isToday(day), wknd = isWeekend(day);
+                const isWeekStart = day.getDay() === 1;
                 return (
                   <th key={day.toISOString()}
                     ref={tod ? todayThRef : undefined}
                     className="text-center pb-2 pt-3 align-bottom"
-                    style={{ background: "transparent" }}>
+                    style={{
+                      background: "transparent",
+                      borderLeft: isWeekStart ? "2px solid rgba(255,255,255,0.18)" : undefined,
+                      paddingLeft: isWeekStart ? "4px" : undefined,
+                    }}>
                     <div className="flex flex-col items-center gap-[2px]">
                       <span
-                        className="text-[10px] font-semibold w-[16px] h-[16px] flex items-center justify-center rounded-full leading-none"
+                        className="text-[10px] font-semibold w-[18px] h-[18px] flex items-center justify-center rounded-full leading-none"
                         style={{
                           backgroundColor: tod ? "#f06060" : "transparent",
                           color: tod ? "#fff" : wknd ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.5)"
                         }}>
                         {format(day, "d")}
                       </span>
-                      <span className="text-[7px] font-medium leading-none"
-                        style={{ color: wknd ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.26)" }}>
+                      <span className="text-[8px] font-medium leading-none"
+                        style={{ color: wknd ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.3)" }}>
                         {DAY_ABBR[day.getDay()]}
                       </span>
                     </div>
@@ -472,7 +475,13 @@ export default function Home() {
                   {/* Empty tiles for day columns */}
                   {days.map(day => (
                     <td key={format(day, "yyyy-MM-dd")}
-                      style={{ backgroundColor: isWeekend(day) ? "#121224" : "#141626", borderRadius: "3px", height: "24px" }}/>
+                      style={{
+                        backgroundColor: isWeekend(day) ? "#121224" : "#141626",
+                        borderRadius: "4px",
+                        height: "52px",
+                        width: "52px",
+                        borderLeft: day.getDay() === 1 ? "2px solid rgba(255,255,255,0.18)" : undefined,
+                      }}/>
                   ))}
                 </tr>
               ) : (
@@ -489,27 +498,8 @@ export default function Home() {
               )}
             </tbody>
           </table>
-      </div>
-
-      {/* ── Right sidebar ── */}
-      <div className="flex-shrink-0 flex flex-col" style={{ width: 240, borderLeft: "1px solid rgba(255,255,255,0.05)", backgroundColor: "#171929" }}>
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Детали</span>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4">
-          <div style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5">
-              <rect x="3" y="4" width="18" height="18" rx="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center" }}>Выберите событие<br/>для просмотра деталей</p>
-        </div>
-      </div>
-
-      </div>{/* end main flex row */}
+      </div>{/* end gridRef */}
+      </div>{/* end centering wrapper */}
 
       {/* ── Legend footer ── */}
       <div className="flex-shrink-0 flex items-center justify-center gap-6 py-3"
@@ -671,7 +661,7 @@ function EntityRow({
   return (
     <tr>
       {/* Entity name — transparent, no tile effect */}
-      <td style={{ background: "transparent", borderRadius: 0, padding: "0 16px", height: "28px", verticalAlign: "middle" }}>
+      <td style={{ background: "transparent", borderRadius: 0, padding: "0 12px", height: "52px", verticalAlign: "middle" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
           <span style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: entity.color, flexShrink: 0, display: "inline-block" }}/>
           {editing ? (
@@ -722,17 +712,19 @@ function EntityRow({
           : firstEv
             ? STATUS_COLORS[firstEv.status]
             : emptyColor;
+        const isWeekStart = day.getDay() === 1;
         return (
           <td key={dateStr}
             style={{
               backgroundColor: tileColor,
-              borderRadius: "3px",
+              borderRadius: "4px",
               padding: 0,
-              height: "24px",
-              width: "24px",
+              height: "52px",
+              width: "52px",
               verticalAlign: "middle",
               opacity: (firstEv?.done && !isDragTarget) ? 0.35 : 1,
               transition: "background-color 0.1s",
+              borderLeft: isWeekStart ? "2px solid rgba(255,255,255,0.18)" : undefined,
             }}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}
@@ -1054,7 +1046,11 @@ function GridCell({
   /* ── Single event — td is the status-colored tile, this is just interaction ── */
   const first = events[0];
   const hasTime = !!(first.startTime && first.endTime);
-  const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
+  const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "12ч";
+  const earn = first.earnings ?? 0;
+  const assigneeShort = first.assignee && first.assignee !== "—"
+    ? first.assignee.split(" ")[0]
+    : "";
 
   return (
     <>
@@ -1062,7 +1058,7 @@ function GridCell({
         data-testid={`cell-event-${entityId}-${date}`}
         data-event-id={first.id}
         draggable
-        onMouseEnter={e => { onCellEnter(); hoveredEventForCopy = first; showCard(); (e.currentTarget as HTMLElement).style.filter = "brightness(1.25)"; }}
+        onMouseEnter={e => { onCellEnter(); hoveredEventForCopy = first; showCard(); (e.currentTarget as HTMLElement).style.filter = "brightness(1.2)"; }}
         onMouseLeave={e => { onCellLeave(); hoveredEventForCopy = null; hideCard(); (e.currentTarget as HTMLElement).style.filter = ""; }}
         onDragStart={e => { e.dataTransfer.effectAllowed = "move"; onDragStart(first.id, entityId, date); setHoverCard(false); }}
         onDragEnd={onDragEnd}
@@ -1077,8 +1073,25 @@ function GridCell({
           transition: "filter 0.1s",
           outline: copiedEventId === first.id ? "1px solid rgba(125,211,252,0.6)" : "none",
           outlineOffset: "-1px",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          padding: "3px 2px", overflow: "hidden", gap: "1px",
         }}
-      />
+      >
+        {assigneeShort && (
+          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.95)", fontWeight: 700, lineHeight: 1.1, textAlign: "center", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+            {assigneeShort}
+          </span>
+        )}
+        <span style={{ fontSize: 8, color: "rgba(255,255,255,0.72)", lineHeight: 1.1, fontWeight: 500 }}>
+          {dur}
+        </span>
+        {earn > 0 && (
+          <span style={{ fontSize: 8, color: "rgba(255,255,255,0.9)", fontWeight: 700, lineHeight: 1.1 }}>
+            {earn >= 1000 ? `${Math.round(earn / 1000)}к₽` : `${earn}₽`}
+          </span>
+        )}
+      </div>
 
       {/* ── Hover Info Card ── */}
       {hoverCard && (
@@ -1241,11 +1254,10 @@ function EventInfoCard({
 const QUICK_DURATIONS = [
   { label: "30 м", mins: 30 },
   { label: "1 ч",  mins: 60 },
-  { label: "1.5 ч",mins: 90 },
   { label: "2 ч",  mins: 120 },
-  { label: "3 ч",  mins: 180 },
   { label: "4 ч",  mins: 240 },
   { label: "8 ч",  mins: 480 },
+  { label: "12 ч", mins: 720 },
 ];
 
 function TimeSpinner({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
