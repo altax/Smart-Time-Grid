@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   addMonths, subMonths, isToday, isWeekend, parseISO,
-  startOfWeek, endOfWeek,
+  startOfWeek, endOfWeek, isSameMonth,
 } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
@@ -261,6 +261,10 @@ export default function Home() {
     setRowDragOverId(null);
     setDraggingEntityId(null);
   }, []);
+
+  /* today + month context */
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const isCurrentMonthView = isSameMonth(currentMonth, new Date());
 
   /* stats */
   const upcomingN     = events.filter(e => e.status === "upcoming").length;
@@ -774,7 +778,11 @@ export default function Home() {
             }}>
               <colgroup>
                 <col style={{ width: 220, minWidth: 200 }}/>
-                {days.map(d => <col key={d.toISOString()}/>)}
+                {days.map(d => {
+                  const dStr = format(d, "yyyy-MM-dd");
+                  const isCompact = isCurrentMonthView && dStr < todayStr;
+                  return <col key={d.toISOString()} style={isCompact ? { width: 16, minWidth: 16 } : {}}/>;
+                })}
               </colgroup>
 
               <thead style={{ position: "sticky", top: 0, zIndex: 20, background: BASE }}>
@@ -787,13 +795,14 @@ export default function Home() {
                   </th>
                   {weekGroups.map((wDays, wi) => {
                     const earn = weekEarnings(wDays);
+                    const allPast = isCurrentMonthView && wDays.every(d => format(d, "yyyy-MM-dd") < todayStr);
                     return (
                       <th key={wi} colSpan={wDays.length}
                         style={{
                           background: BASE, padding: "8px 0 2px", textAlign: "center", verticalAlign: "middle",
                           borderLeft: wi > 0 ? `4px solid ${BASE}` : undefined,
                         }}>
-                        {earn > 0 ? (
+                        {allPast ? null : earn > 0 ? (
                           <span style={{
                             display: "inline-flex", alignItems: "center",
                             fontSize: 9, fontWeight: 700, color: GREEN,
@@ -815,6 +824,21 @@ export default function Home() {
                   <th style={{ background: BASE, position: "sticky", left: 0, zIndex: 30, padding: "2px 10px 6px 12px" }}/>
                   {days.map(day => {
                     const tod = isToday(day), wknd = isWeekend(day);
+                    const dStr = format(day, "yyyy-MM-dd");
+                    const isCompact = isCurrentMonthView && dStr < todayStr;
+                    if (isCompact) {
+                      return (
+                        <th key={day.toISOString()}
+                          style={{
+                            padding: "2px 0 6px", verticalAlign: "bottom", textAlign: "center",
+                            borderLeft: day.getDay() === 1 ? `4px solid ${BASE}` : undefined,
+                          }}>
+                          <span style={{ fontSize: 7, fontWeight: 400, color: FG_DIM, opacity: 0.3, display: "block", lineHeight: 1 }}>
+                            {format(day, "d")}
+                          </span>
+                        </th>
+                      );
+                    }
                     return (
                       <th key={day.toISOString()}
                         ref={tod ? todayThRef : undefined}
@@ -1249,16 +1273,20 @@ function EntityRow({
   const CELL_PAST_BG     = "rgba(84,96,112,0.22)";
   const CELL_DRAG_BG     = "rgba(91,156,246,0.3)";
 
+  const todayDateStr = format(new Date(), "yyyy-MM-dd");
+  const isCurrentMonthView = days.length > 0 && isSameMonth(days[0], new Date());
+
   return (
-    <tr className={`entity-row${isDragging ? " entity-row-dragging" : ""}`}>
+    <tr
+      className={`entity-row${isDragging ? " entity-row-dragging" : ""}`}
+      onDragOver={e => { if (activeRowDrag) { e.preventDefault(); onRowDragOver(entity.id); } }}
+      onDrop={e => { if (activeRowDrag) { e.preventDefault(); onRowDrop(entity.id); } }}
+    >
       {/* ── Entity name cell ── */}
       <td style={{
         background: BASE_R, position: "sticky", left: 0, zIndex: 10,
         padding: "0 6px 0 0", height: 44, verticalAlign: "middle",
-      }}
-        onDragOver={e => { if (activeRowDrag) { e.preventDefault(); e.stopPropagation(); onRowDragOver(entity.id); } }}
-        onDrop={e => { if (e.dataTransfer.getData("entity-row")) { e.preventDefault(); e.stopPropagation(); onRowDrop(entity.id); } }}
-      >
+      }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9, height: "100%", padding: "0 0 0 6px" }}>
           {/* Drag handle */}
           <div
@@ -1328,6 +1356,46 @@ function EntityRow({
         const key  = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
         const firstEv = cellEvents[0];
+        const isWeekStart = day.getDay() === 1;
+        const isCompactPast = isCurrentMonthView && dateStr < todayDateStr;
+
+        /* ── Compact past day ── */
+        if (isCompactPast) {
+          const pillColor = firstEv
+            ? (firstEv.status === "past" ? SLATE_R : BLUE_R)
+            : undefined;
+          return (
+            <td key={dateStr}
+              style={{
+                padding: 0, height: 44, verticalAlign: "middle",
+                borderLeft: isWeekStart ? `4px solid ${BASE_R}` : undefined,
+              }}>
+              {pillColor && (
+                <div
+                  onClick={e => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    onEventClick(firstEv, rect);
+                  }}
+                  title={`${dateStr} · ${firstEv.status === "past" ? "Прошедшая" : "Будущая"}`}
+                  style={{
+                    width: "100%", height: "100%",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer",
+                  }}>
+                  <div style={{
+                    width: 5, height: 26, borderRadius: 3,
+                    background: pillColor,
+                    opacity: 0.75,
+                    transition: "opacity 0.15s, transform 0.15s",
+                  }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.transform = "scaleY(1.1)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.75"; (e.currentTarget as HTMLElement).style.transform = "scaleY(1)"; }}
+                  />
+                </div>
+              )}
+            </td>
+          );
+        }
 
         let cellBg: string | undefined;
         let leftBorderColor: string | undefined;
@@ -1341,7 +1409,6 @@ function EntityRow({
           leftBorderColor = isPast ? SLATE_R : BLUE_R;
         }
 
-        const isWeekStart = day.getDay() === 1;
         const cellClass = !firstEv && !isDragTarget ? (wknd ? "cell-weekend" : tod ? "today-col" : "cell-empty") : "";
 
         return (
