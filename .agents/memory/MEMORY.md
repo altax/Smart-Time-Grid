@@ -1,1 +1,2 @@
-- [Shift planner design decisions](shift-planner-design.md) — single-user, 3 statuses, fixed 9-21h shift, no assignees, no glassmorphism
+- [Shift planner design decisions](shift-planner-design.md) — single-user, 2 statuses (upcoming/past), fixed 9-21h shift, no assignees, no glassmorphism
+- [Shift planner DB migration](shift-planner-db.md) — moved from localStorage to PostgreSQL via Drizzle ORM; status normalization pattern for legacy data

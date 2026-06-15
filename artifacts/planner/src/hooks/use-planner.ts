@@ -1,97 +1,137 @@
 import { useState, useEffect, useCallback } from "react";
-import { format } from "date-fns";
-import { Entity, PlannerEvent, Goal, ENTITY_PALETTE } from "../types";
-
-const ENTITIES_KEY = "planner_entities_v4";
-const GOALS_KEY    = "planner_goals_v1";
-const getEventsKey = (date: Date) => `planner_events_v4_${format(date, "yyyy-MM")}`;
-
-function load<T>(key: string, fallback: T): T {
-  try {
-    const s = localStorage.getItem(key);
-    return s ? JSON.parse(s) : fallback;
-  } catch { return fallback; }
-}
-function save<T>(key: string, value: T) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
-}
+import { Entity, PlannerEvent, EventStatus, Goal, Expense, ENTITY_PALETTE } from "../types";
 
 function genId() { return Math.random().toString(36).substring(2, 12); }
 function pickColor(i: number) { return ENTITY_PALETTE[i % ENTITY_PALETTE.length]; }
 
-export function usePlanner(currentMonth: Date) {
-  const eventsKey = getEventsKey(currentMonth);
-
-  const [entities, setEntities] = useState<Entity[]>(() => {
-    return load<Entity[]>(ENTITIES_KEY, []);
+async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
+  const r = await fetch(`/api/planner${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
   });
+  if (!r.ok) throw new Error(`API ${opts?.method ?? "GET"} ${path} → ${r.status}`);
+  return r.json() as Promise<T>;
+}
+
+export function usePlanner() {
+  const [entities, setEntities] = useState<Entity[]>([]);
   const [events,   setEvents]   = useState<PlannerEvent[]>([]);
-  const [goals,    setGoals]    = useState<Goal[]>(() => load<Goal[]>(GOALS_KEY, []));
+  const [goals,    setGoals]    = useState<Goal[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
-  const loadEvents = useCallback(() => {
-    setEvents(load<PlannerEvent[]>(eventsKey, []));
-  }, [eventsKey]);
+  useEffect(() => {
+    Promise.all([
+      apiFetch<Entity[]>("/entities"),
+      apiFetch<PlannerEvent[]>("/events"),
+      apiFetch<Goal[]>("/goals"),
+      apiFetch<Expense[]>("/expenses"),
+    ]).then(([ents, evts, gls, exps]) => {
+      setEntities(ents);
+      setEvents(evts.map(e => {
+        const s = e.status as string;
+        const normalized: EventStatus =
+          s === "planned" || s === "confirmed" || s === "pending" ? "upcoming" :
+          s === "overdue" ? "past" :
+          (s as EventStatus);
+        return { ...e, status: normalized } as PlannerEvent;
+      }));
+      setGoals(gls);
+      setExpenses(exps);
+    }).catch(console.error).finally(() => setLoading(false));
+  }, []);
 
-  useEffect(() => { loadEvents(); }, [loadEvents]);
+  /* ── Entities ── */
+  const addEntity = useCallback(async (name: string) => {
+    const ent: Entity = { id: genId(), name, color: pickColor(entities.length) };
+    setEntities(prev => [...prev, ent]);
+    try { await apiFetch("/entities", { method: "POST", body: JSON.stringify(ent) }); }
+    catch (e) { console.error(e); }
+  }, [entities.length]);
 
-  const setEnts      = (next: Entity[])       => { setEntities(next); save(ENTITIES_KEY, next); };
-  const setEvts      = (next: PlannerEvent[]) => { setEvents(next);   save(eventsKey, next); };
-  const setGoalsList = (next: Goal[])         => { setGoals(next);    save(GOALS_KEY, next); };
+  const deleteEntity = useCallback(async (id: string) => {
+    setEntities(prev => prev.filter(e => e.id !== id));
+    setEvents(prev => prev.filter(ev => ev.entityId !== id));
+    try { await apiFetch(`/entities/${id}`, { method: "DELETE" }); }
+    catch (e) { console.error(e); }
+  }, []);
 
-  const addEntity    = (name: string) => setEnts([...entities, { id: genId(), name, color: pickColor(entities.length) }]);
-  const deleteEntity = (id: string)   => { setEnts(entities.filter(e => e.id !== id)); setEvts(events.filter(ev => ev.entityId !== id)); };
-  const renameEntity = (id: string, name: string) => setEnts(entities.map(e => e.id === id ? { ...e, name } : e));
+  const renameEntity = useCallback(async (id: string, name: string) => {
+    setEntities(prev => prev.map(e => e.id === id ? { ...e, name } : e));
+    try { await apiFetch(`/entities/${id}`, { method: "PATCH", body: JSON.stringify({ name }) }); }
+    catch (e) { console.error(e); }
+  }, []);
 
-  const addEvent    = (ev: PlannerEvent)  => setEvts([...events, ev]);
-  const updateEvent = (upd: PlannerEvent) => setEvts(events.map(ev => ev.id === upd.id ? upd : ev));
-  const deleteEvent = (id: string)        => setEvts(events.filter(ev => ev.id !== id));
+  /* ── Events ── */
+  const addEvent = useCallback(async (ev: PlannerEvent) => {
+    setEvents(prev => [...prev, ev]);
+    try { await apiFetch("/events", { method: "POST", body: JSON.stringify(ev) }); }
+    catch (e) { console.error(e); }
+  }, []);
 
-  const moveEvent = (eventId: string, newEntityId: string, newDate: string) =>
-    setEvts(events.map(ev => ev.id === eventId ? { ...ev, entityId: newEntityId, date: newDate } : ev));
+  const updateEvent = useCallback(async (upd: PlannerEvent) => {
+    setEvents(prev => prev.map(ev => ev.id === upd.id ? upd : ev));
+    try { await apiFetch(`/events/${upd.id}`, { method: "PATCH", body: JSON.stringify(upd) }); }
+    catch (e) { console.error(e); }
+  }, []);
 
-  const getEventsForCell       = (entityId: string, date: string) => events.filter(ev => ev.entityId === entityId && ev.date === date);
-  const getEventCountForEntity = (entityId: string)               => events.filter(ev => ev.entityId === entityId).length;
-  const getAllEventsForDay      = (date: string)                   => events.filter(ev => ev.date === date);
+  const deleteEvent = useCallback(async (id: string) => {
+    setEvents(prev => prev.filter(ev => ev.id !== id));
+    try { await apiFetch(`/events/${id}`, { method: "DELETE" }); }
+    catch (e) { console.error(e); }
+  }, []);
 
-  const addGoal    = (name: string, amount: number) => setGoalsList([...goals, { id: genId(), name, amount }]);
-  const updateGoal = (g: Goal)    => setGoalsList(goals.map(gx => gx.id === g.id ? g : gx));
-  const deleteGoal = (id: string) => setGoalsList(goals.filter(g => g.id !== id));
+  const moveEvent = useCallback(async (eventId: string, newEntityId: string, newDate: string) => {
+    setEvents(prev => prev.map(ev => ev.id === eventId ? { ...ev, entityId: newEntityId, date: newDate } : ev));
+    try { await apiFetch(`/events/${eventId}`, { method: "PATCH", body: JSON.stringify({ entityId: newEntityId, date: newDate }) }); }
+    catch (e) { console.error(e); }
+  }, []);
 
-  const loadDemoData = () => {
-    const m = format(new Date(), "yyyy-MM");
-    const ents: Entity[] = [
-      { id: "d1", name: "Ресторан на Невском",  color: ENTITY_PALETTE[0] },
-      { id: "d2", name: "Кафе Садовая",         color: ENTITY_PALETTE[2] },
-      { id: "d3", name: "Бар Лиговский",        color: ENTITY_PALETTE[8] },
-      { id: "d4", name: "Ресторан Васильевский", color: ENTITY_PALETTE[4] },
-    ];
-    const todayDate = new Date();
-    const todayStr  = format(todayDate, "yyyy-MM-dd");
-    const evts: PlannerEvent[] = [
-      { id:"s1",  entityId:"d1", date:`${m}-03`, status:"past",      earnings:4800 },
-      { id:"s2",  entityId:"d2", date:`${m}-05`, status:"past",      earnings:4200 },
-      { id:"s3",  entityId:"d1", date:`${m}-08`, status:"past",      earnings:4800 },
-      { id:"s4",  entityId:"d3", date:`${m}-10`, status:"past",      earnings:5200 },
-      { id:"s5",  entityId:"d2", date:`${m}-12`, status:"past",      earnings:4200 },
-      { id:"s6",  entityId:"d1", date:`${m}-14`, status:"past",      earnings:4800 },
-      { id:"s7",  entityId:"d4", date:`${m}-16`, status:"confirmed", earnings:5000, notes:"Взять форму" },
-      { id:"s8",  entityId:"d2", date:`${m}-18`, status:"confirmed", earnings:4200 },
-      { id:"s9",  entityId:"d1", date:`${m}-20`, status:"planned",   earnings:4800 },
-      { id:"s10", entityId:"d3", date:`${m}-22`, status:"planned",   earnings:5200 },
-      { id:"s11", entityId:"d4", date:`${m}-24`, status:"planned",   earnings:5000 },
-      { id:"s12", entityId:"d2", date:`${m}-26`, status:"planned",   earnings:4200 },
-      { id:"s13", entityId:"d1", date:`${m}-28`, status:"planned",   earnings:4800 },
-    ];
-    setEnts(ents);
-    setEvts(evts);
-  };
+  /* ── Goals ── */
+  const addGoal = useCallback(async (name: string, amount: number) => {
+    const g: Goal = { id: genId(), name, amount };
+    setGoals(prev => [...prev, g]);
+    try { await apiFetch("/goals", { method: "POST", body: JSON.stringify(g) }); }
+    catch (e) { console.error(e); }
+  }, []);
+
+  const updateGoal = useCallback(async (g: Goal) => {
+    setGoals(prev => prev.map(gx => gx.id === g.id ? g : gx));
+    try { await apiFetch(`/goals/${g.id}`, { method: "PATCH", body: JSON.stringify(g) }); }
+    catch (e) { console.error(e); }
+  }, []);
+
+  const deleteGoal = useCallback(async (id: string) => {
+    setGoals(prev => prev.filter(g => g.id !== id));
+    try { await apiFetch(`/goals/${id}`, { method: "DELETE" }); }
+    catch (e) { console.error(e); }
+  }, []);
+
+  /* ── Expenses ── */
+  const addExpense = useCallback(async (description: string, amount: number, date: string) => {
+    const exp: Expense = { id: genId(), description, amount, date };
+    setExpenses(prev => [...prev, exp].sort((a, b) => b.date.localeCompare(a.date)));
+    try { await apiFetch("/expenses", { method: "POST", body: JSON.stringify(exp) }); }
+    catch (e) { console.error(e); }
+  }, []);
+
+  const deleteExpense = useCallback(async (id: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+    try { await apiFetch(`/expenses/${id}`, { method: "DELETE" }); }
+    catch (e) { console.error(e); }
+  }, []);
+
+  /* ── Selectors ── */
+  const getEventsForCell       = useCallback((entityId: string, date: string) => events.filter(ev => ev.entityId === entityId && ev.date === date), [events]);
+  const getEventCountForEntity = useCallback((entityId: string) => events.filter(ev => ev.entityId === entityId).length, [events]);
+  const getAllEventsForDay      = useCallback((date: string) => events.filter(ev => ev.date === date), [events]);
 
   return {
-    entities, events, goals,
+    entities, events, goals, expenses, loading,
     addEntity, deleteEntity, renameEntity,
     addEvent, updateEvent, deleteEvent, moveEvent,
     getEventsForCell, getEventCountForEntity, getAllEventsForDay,
     addGoal, updateGoal, deleteGoal,
-    loadDemoData,
+    addExpense, deleteExpense,
   };
 }

@@ -1,4 +1,4 @@
-export type EventStatus = "planned" | "confirmed" | "past";
+export type EventStatus = "upcoming" | "past";
 
 export interface Entity {
   id: string;
@@ -24,8 +24,6 @@ export interface PlannerEvent {
   title?: string;
   notes?: string;
   earnings?: number;
-  expenses?: number;
-  done?: boolean;
   // legacy compat fields (not shown in UI):
   assignee?: string;
   startTime?: string;
@@ -39,31 +37,34 @@ export interface Goal {
   amount: number;
 }
 
+export interface Expense {
+  id: string;
+  description: string;
+  amount: number;
+  date: string; // YYYY-MM-DD
+}
+
 export const STATUS_COLORS: Record<string, string> = {
-  planned:   "#5b9cf6",
-  confirmed: "#3ecf8e",
+  upcoming:  "#5b9cf6",
   past:      "#546070",
   // backward compat
+  planned:   "#5b9cf6",
+  confirmed: "#5b9cf6",
   pending:   "#5b9cf6",
   overdue:   "#546070",
 };
 
-export const STATUS_GRADIENTS: Record<string, string> = {
-  planned:   "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
-  confirmed: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  past:      "linear-gradient(135deg, #546070 0%, #3d4f5f 100%)",
-};
-
 export const STATUS_LABELS: Record<string, string> = {
-  planned:   "Запланировано",
-  confirmed: "Подтверждено",
-  past:      "Прошедшее",
+  upcoming:  "Будущая",
+  past:      "Прошедшая",
   // backward compat
-  pending:   "Запланировано",
-  overdue:   "Прошедшее",
+  planned:   "Будущая",
+  confirmed: "Будущая",
+  pending:   "Будущая",
+  overdue:   "Прошедшая",
 };
 
-export const STATUS_CYCLE: EventStatus[] = ["planned", "confirmed", "past"];
+export const STATUS_CYCLE: EventStatus[] = ["upcoming", "past"];
 
 export const ENTITY_PALETTE = [
   "#6366f1","#3b82f6","#0ea5e9","#06b6d4","#14b8a6",
