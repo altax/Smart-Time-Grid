@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   addMonths, subMonths, isToday, isWeekend, parseISO,
@@ -104,7 +104,8 @@ export default function Home() {
   const [showExpenses, setShowExpenses] = useState(true);
 
   /* row drag for reordering entities */
-  const [rowDragOverId, setRowDragOverId] = useState<string | null>(null);
+  const [rowDragOverId,    setRowDragOverId]    = useState<string | null>(null);
+  const [draggingEntityId, setDraggingEntityId] = useState<string | null>(null);
   const entitiesRef = useRef(entities);
   useEffect(() => { entitiesRef.current = entities; }, [entities]);
 
@@ -235,6 +236,7 @@ export default function Home() {
   /* row drag handlers for entity reordering */
   const handleRowDragStart = useCallback((entityId: string) => {
     activeRowDrag = { entityId };
+    setDraggingEntityId(entityId);
   }, []);
   const handleRowDragOver = useCallback((entityId: string) => {
     if (!activeRowDrag || activeRowDrag.entityId === entityId) return;
@@ -257,6 +259,7 @@ export default function Home() {
   const handleRowDragEnd = useCallback(() => {
     activeRowDrag = null;
     setRowDragOverId(null);
+    setDraggingEntityId(null);
   }, []);
 
   /* stats */
@@ -549,11 +552,13 @@ export default function Home() {
             {showGoals && (
               <GoalsSidebarSection
                 goals={goals}
-                monthNet={totalEarnings}
+                netBalance={netBalance}
+                totalEarnings={totalEarnings}
+                totalExpenses={totalDiaryExp}
                 onAddGoal={addGoal}
                 onUpdateGoal={updateGoal}
                 onDeleteGoal={deleteGoal}
-                BLUE={BLUE} BORDER={BORDER} FG={FG} FG_MED={FG_MED} FG_DIM={FG_DIM}
+                BLUE={BLUE} BORDER={BORDER} FG={FG} FG_MED={FG_MED} FG_DIM={FG_DIM} GREEN={GREEN} RED={RED}
               />
             )}
           </div>
@@ -867,35 +872,41 @@ export default function Home() {
                 )}
 
                 {entities.map(entity => (
-                  <EntityRow
-                    key={entity.id}
-                    entity={entity}
-                    days={days}
-                    eventCount={getEventCountForEntity(entity.id)}
-                    getEventsForCell={getEventsForCell}
-                    dragOverKey={dragOverKey}
-                    rowDragOverId={rowDragOverId}
-                    onCellClick={openAdd}
-                    onEventClick={openView}
-                    onContextMenu={openCtx}
-                    onShiftClick={ev => {
-                      const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(ev.status as EventStatus) + 1) % STATUS_CYCLE.length] as EventStatus;
-                      updateEvent({ ...ev, status: next });
-                    }}
-                    onMarkPast={handleMarkPast}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onDeleteEntity={deleteEntity}
-                    onRenameEntity={renameEntity}
-                    copiedEventId={copiedEvent?.id ?? null}
-                    onCopyEvent={ev => { setCopiedEvent(ev); copiedEventRef.current = ev; }}
-                    onRowDragStart={handleRowDragStart}
-                    onRowDragOver={handleRowDragOver}
-                    onRowDrop={handleRowDrop}
-                    onRowDragEnd={handleRowDragEnd}
-                  />
+                  <React.Fragment key={entity.id}>
+                    {rowDragOverId === entity.id && (
+                      <tr className="drag-row-indicator">
+                        <td colSpan={days.length + 1}><div className="drag-row-indicator-line"/></td>
+                      </tr>
+                    )}
+                    <EntityRow
+                      entity={entity}
+                      days={days}
+                      eventCount={getEventCountForEntity(entity.id)}
+                      getEventsForCell={getEventsForCell}
+                      dragOverKey={dragOverKey}
+                      isDragging={draggingEntityId === entity.id}
+                      onCellClick={openAdd}
+                      onEventClick={openView}
+                      onContextMenu={openCtx}
+                      onShiftClick={ev => {
+                        const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(ev.status as EventStatus) + 1) % STATUS_CYCLE.length] as EventStatus;
+                        updateEvent({ ...ev, status: next });
+                      }}
+                      onMarkPast={handleMarkPast}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onDeleteEntity={deleteEntity}
+                      onRenameEntity={renameEntity}
+                      copiedEventId={copiedEvent?.id ?? null}
+                      onCopyEvent={ev => { setCopiedEvent(ev); copiedEventRef.current = ev; }}
+                      onRowDragStart={handleRowDragStart}
+                      onRowDragOver={handleRowDragOver}
+                      onRowDrop={handleRowDrop}
+                      onRowDragEnd={handleRowDragEnd}
+                    />
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -970,15 +981,15 @@ export default function Home() {
 
 /* ─────────────────────── GoalsSidebarSection ─────────────────────── */
 function GoalsSidebarSection({
-  goals, monthNet,
+  goals, netBalance, totalEarnings, totalExpenses,
   onAddGoal, onUpdateGoal, onDeleteGoal,
-  BLUE, BORDER, FG, FG_MED, FG_DIM,
+  BLUE, BORDER, FG, FG_MED: _FG_MED, FG_DIM, GREEN, RED,
 }: {
-  goals: Goal[]; monthNet: number;
+  goals: Goal[]; netBalance: number; totalEarnings: number; totalExpenses: number;
   onAddGoal: (name: string, amount: number) => void;
   onUpdateGoal: (g: Goal) => void;
   onDeleteGoal: (id: string) => void;
-  BLUE: string; BORDER: string; FG: string; FG_MED: string; FG_DIM: string;
+  BLUE: string; BORDER: string; FG: string; FG_MED: string; FG_DIM: string; GREEN: string; RED: string;
 }) {
   const [showAdd,    setShowAdd]    = useState(false);
   const [newName,    setNewName]    = useState("");
@@ -1003,8 +1014,52 @@ function GoalsSidebarSection({
     setEditId(null);
   };
 
+  const savings = Math.max(0, netBalance);
+
   return (
     <div>
+      {/* ── Balance card ── */}
+      {(totalEarnings > 0 || totalExpenses > 0) && (
+        <div style={{
+          borderRadius: 9, border: `1px solid ${BORDER}`,
+          background: "rgba(255,255,255,0.02)",
+          padding: "10px 12px", marginBottom: 12,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: FG_DIM, letterSpacing: "0.07em", textTransform: "uppercase" }}>Баланс месяца</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <ArrowUpRight style={{ width: 10, height: 10, color: GREEN }}/>
+                <span style={{ fontSize: 11, color: FG_DIM }}>Заработано</span>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: GREEN }}>+{fmtK(totalEarnings)} ₽</span>
+            </div>
+            {totalExpenses > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <ArrowDownRight style={{ width: 10, height: 10, color: RED }}/>
+                  <span style={{ fontSize: 11, color: FG_DIM }}>Потрачено</span>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: RED }}>−{fmtK(totalExpenses)} ₽</span>
+              </div>
+            )}
+            <div style={{ height: 1, background: BORDER, margin: "2px 0" }}/>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: FG }}>Чистых</span>
+              <span style={{
+                fontSize: 13, fontWeight: 800,
+                color: netBalance >= 0 ? GREEN : RED,
+              }}>
+                {netBalance >= 0 ? "+" : "−"}{fmtK(Math.abs(netBalance))} ₽
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add goal button ── */}
       <button
         onClick={() => setShowAdd(v => !v)}
         style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: FG_DIM, cursor: "pointer", background: "transparent", border: "none", padding: "0 0 6px 0", transition: "color 0.1s" }}
@@ -1048,8 +1103,9 @@ function GoalsSidebarSection({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {goals.map(goal => {
-          const progress = monthNet > 0 ? Math.min(1, monthNet / goal.amount) : 0;
-          const reached  = monthNet >= goal.amount;
+          const progress  = savings > 0 ? Math.min(1, savings / goal.amount) : 0;
+          const reached   = savings >= goal.amount;
+          const remaining = Math.max(0, goal.amount - savings);
           const isEditing = editId === goal.id;
 
           return (
@@ -1081,7 +1137,7 @@ function GoalsSidebarSection({
                 </div>
               ) : (
                 <>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0, flex: 1 }}>
                       {reached
                         ? <Trophy style={{ width: 11, height: 11, color: "#3ecf8e", flexShrink: 0 }}/>
@@ -1100,22 +1156,30 @@ function GoalsSidebarSection({
                       </button>
                     </div>
                   </div>
-                  <div style={{ marginBottom: 4 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 3, color: FG_DIM }}>
-                      <span>{fmtK(Math.max(0, monthNet))} / {fmtK(goal.amount)} ₽</span>
+
+                  {/* Progress bar */}
+                  <div style={{ marginBottom: reached ? 6 : 4 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, marginBottom: 4, color: FG_DIM }}>
+                      <span>{fmtK(savings)} / {fmtK(goal.amount)} ₽</span>
                       <span style={{ fontWeight: 700, color: reached ? "#3ecf8e" : "#8b5cf6" }}>{Math.round(progress * 100)}%</span>
                     </div>
-                    <div style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
+                    <div style={{ width: "100%", height: 5, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
                       <div style={{
-                        height: "100%", borderRadius: 99, transition: "width 0.3s",
+                        height: "100%", borderRadius: 99, transition: "width 0.4s ease",
                         width: `${progress * 100}%`,
                         background: reached ? "#10b981" : "linear-gradient(90deg, #8b5cf6, #6366f1)",
                       }}/>
                     </div>
                   </div>
-                  {reached && (
-                    <div style={{ fontSize: 10, fontWeight: 700, color: "#3ecf8e" }}>🎉 Цель достигнута!</div>
-                  )}
+
+                  {reached
+                    ? <div style={{ fontSize: 10, fontWeight: 700, color: "#3ecf8e" }}>🎉 Цель достигнута!</div>
+                    : remaining > 0 && (
+                      <div style={{ fontSize: 10, color: FG_DIM }}>
+                        Ещё нужно: <span style={{ fontWeight: 700, color: "#8b5cf6" }}>{fmtK(remaining)} ₽</span>
+                      </div>
+                    )
+                  }
                 </>
               )}
             </div>
@@ -1132,7 +1196,7 @@ interface EntityRowProps {
   days: Date[];
   eventCount: number;
   dragOverKey: string | null;
-  rowDragOverId: string | null;
+  isDragging: boolean;
   getEventsForCell: (eId: string, date: string) => PlannerEvent[];
   onCellClick: (eId: string, date: string, rect: DOMRect) => void;
   onEventClick: (ev: PlannerEvent, rect: DOMRect) => void;
@@ -1153,8 +1217,9 @@ interface EntityRowProps {
   onRowDragEnd: () => void;
 }
 
+
 function EntityRow({
-  entity, days, eventCount: _eventCount, dragOverKey, rowDragOverId,
+  entity, days, eventCount: _eventCount, dragOverKey, isDragging,
   getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick, onMarkPast,
   onDragStart, onDragEnd, onDragOver, onDrop,
   onDeleteEntity, onRenameEntity, copiedEventId, onCopyEvent: _onCopyEvent,
@@ -1184,10 +1249,8 @@ function EntityRow({
   const CELL_PAST_BG     = "rgba(84,96,112,0.22)";
   const CELL_DRAG_BG     = "rgba(91,156,246,0.3)";
 
-  const isRowTarget = rowDragOverId === entity.id;
-
   return (
-    <tr className="entity-row" style={{ borderTop: isRowTarget ? `2px solid ${BLUE_R}` : undefined }}>
+    <tr className={`entity-row${isDragging ? " entity-row-dragging" : ""}`}>
       {/* ── Entity name cell ── */}
       <td style={{
         background: BASE_R, position: "sticky", left: 0, zIndex: 10,
