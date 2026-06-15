@@ -280,9 +280,11 @@ export default function Home() {
   }, [moveEvent]);
 
   /* stats */
-  const overdueN      = events.filter(e => e.status === "overdue").length;
+  const pastN         = events.filter(e => e.status === "past"      || e.status === "overdue").length;
   const confirmedN    = events.filter(e => e.status === "confirmed").length;
-  const pendingN      = events.filter(e => e.status === "pending").length;
+  const plannedN      = events.filter(e => e.status === "planned"   || e.status === "pending").length;
+  const overdueN      = 0; // unused — kept for FinancePanel compat
+  const pendingN      = plannedN; // alias
   const totalEarnings = events.reduce((s, e) => s + (e.earnings ?? 0), 0);
   const totalExpenses = events.reduce((s, e) => s + (e.expenses ?? 0), 0);
   const dayEarnings   = events.filter(e => e.date === dayPanel).reduce((s, e) => s + (e.earnings ?? 0), 0);
@@ -333,36 +335,22 @@ export default function Home() {
   }
 
   /* ── Design tokens ── */
-  const BASE        = "#030712";
-  const PANEL       = "#080d1d";
-  const VIOLET      = "#8b5cf6";
-  const GREEN       = "#10b981";
-  const AMBER       = "#f59e0b";
-  const RED_C       = "#ef4444";
-  const FG          = "rgba(226,232,240,0.9)";
-  const FG_MED      = "rgba(226,232,240,0.55)";
-  const FG_DIM      = "rgba(226,232,240,0.25)";
-  const BORDER      = "rgba(255,255,255,0.058)";
-  const BORDER_MED  = "rgba(255,255,255,0.1)";
-  const DAY_SHORT   = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
-
-  /* ── Staff avatar color ── */
-  function avatarColor(name: string): string {
-    const palette = ["#8b5cf6","#06b6d4","#f59e0b","#10b981","#ef4444","#3b82f6","#ec4899","#f97316"];
-    let h = 0;
-    for (const c of name) h = (h << 5) - h + c.charCodeAt(0);
-    return palette[Math.abs(h) % palette.length];
-  }
+  const BASE    = "#0f1219";
+  const PANEL   = "#131926";
+  const BLUE    = "#5b9cf6";
+  const GREEN   = "#3ecf8e";
+  const SLATE   = "#546070";
+  const FG      = "#c2cfdc";
+  const FG_MED  = "#6d8396";
+  const FG_DIM  = "#374557";
+  const BORDER  = "rgba(255,255,255,0.07)";
+  const DAY_SHORT = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
 
   function fmtK(n: number): string {
     if (n >= 1000000) return `${(n/1000000).toLocaleString("ru-RU",{maximumFractionDigits:1})} М`;
     if (n >= 1000)    return `${(n/1000).toLocaleString("ru-RU",{maximumFractionDigits:1})} к`;
     return `${n}`;
   }
-
-  const pct = events.length > 0 ? confirmedN / events.length : 0;
-  const ringLen = 100;
-  const ringFill = Math.round(pct * ringLen);
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BASE, color: FG, fontFamily: "'Inter', -apple-system, sans-serif" }}>
@@ -376,181 +364,123 @@ export default function Home() {
         overflow: "hidden",
         position: "relative",
       }}>
-        {/* ── Brand bar ── */}
-        <div style={{ padding: "16px 16px 12px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 11,
-                background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-                boxShadow: "0 0 0 1px rgba(124,58,237,0.3), 0 8px 24px rgba(124,58,237,0.25)",
-              }}>
-                <CalendarDays style={{ width: 16, height: 16, color: "#fff" }}/>
+        {/* ── Header: brand + month nav ── */}
+        <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          {/* Logo row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 9,
+              background: BLUE, opacity: 0.9,
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              <CalendarDays style={{ width: 14, height: 14, color: "#fff" }}/>
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: FG, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                Мои смены
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(226,232,240,0.96)", letterSpacing: "-0.025em", lineHeight: 1 }}>
-                  ShiftPlanner
-                </div>
-                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 3, letterSpacing: "0.01em" }}>
-                  {currentMonth.getFullYear()}
-                </div>
+              <div style={{ fontSize: 10, color: FG_DIM, marginTop: 3 }}>
+                {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </div>
             </div>
           </div>
 
-          {/* Month navigation */}
-          <div style={{
-            display: "flex", alignItems: "center",
-            background: "rgba(255,255,255,0.03)",
-            border: `1px solid ${BORDER}`,
-            borderRadius: 10, padding: "3px",
-          }}>
+          {/* Month nav */}
+          <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
             <button data-testid="btn-prev-month" onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0 }}>
-              <ChevronLeft style={{ width: 12, height: 12 }}/>
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid ${BORDER}`, background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0 }}>
+              <ChevronLeft style={{ width: 11, height: 11 }}/>
             </button>
             <button data-testid="btn-today" onClick={() => setCurrentMonth(new Date())}
-              style={{ flex: 1, fontSize: 12, fontWeight: 600, color: FG, background: "transparent", border: "none", cursor: "pointer", textAlign: "center", letterSpacing: "-0.01em" }}>
+              style={{ flex: 1, fontSize: 12, fontWeight: 600, color: FG_MED, background: "transparent", border: "none", cursor: "pointer", textAlign: "center" }}>
               {MONTH_NAMES[currentMonth.getMonth()]}
             </button>
             <button data-testid="btn-next-month" onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0 }}>
-              <ChevronRight style={{ width: 12, height: 12 }}/>
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: `1px solid ${BORDER}`, background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0 }}>
+              <ChevronRight style={{ width: 11, height: 11 }}/>
             </button>
           </div>
         </div>
 
         {/* ── Scrollable body ── */}
-        <div className="sb-thin" style={{ flex: 1, overflowY: "auto", padding: "16px 14px 0" }}>
+        <div className="sb-thin" style={{ flex: 1, overflowY: "auto", padding: "18px 16px 0" }}>
 
-          {/* ── Payroll ring + earnings ── */}
-          <div style={{
-            background: "linear-gradient(145deg, rgba(16,185,129,0.07) 0%, rgba(5,150,105,0.02) 100%)",
-            border: "1px solid rgba(16,185,129,0.12)",
-            borderRadius: 16, padding: "16px",
-            marginBottom: 10,
-            position: "relative", overflow: "hidden",
-          }}>
-            {/* Glow orb */}
-            <div style={{
-              position: "absolute", right: -20, top: -20,
-              width: 100, height: 100, borderRadius: "50%",
-              background: "radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)",
-              pointerEvents: "none",
-            }}/>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              {/* SVG progress ring */}
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                <svg width={64} height={64} viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
-                  <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3"/>
-                  <circle cx="18" cy="18" r="14" fill="none"
-                    stroke="url(#rg)" strokeWidth="3"
-                    strokeDasharray={`${ringFill * 0.879} 87.9`}
-                    strokeLinecap="round"
-                    style={{ transition: "stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)" }}/>
-                  <defs>
-                    <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#059669"/>
-                      <stop offset="100%" stopColor="#34d399"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div style={{
-                  position: "absolute", inset: 0, display: "flex",
-                  alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 800, color: "#34d399", letterSpacing: "-0.03em",
-                }}>
-                  {Math.round(pct * 100)}%
-                </div>
+          {/* ── Month earnings ── */}
+          {totalEarnings > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                Заработок за месяц
               </div>
-
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
-                  Фонд оплаты
-                </div>
-                <div style={{ letterSpacing: "-0.04em", lineHeight: 1 }}>
-                  <span className="grad-green" style={{ fontSize: 30, fontWeight: 900 }}>
-                    {fmtK(totalEarnings)}
-                  </span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "#34d399", marginLeft: 2 }}>₽</span>
-                </div>
-                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 5 }}>
-                  {events.length} смен · {thisWeekEarnings > 0 && <span style={{ color: "#34d399" }}>+{fmtK(thisWeekEarnings)}₽ на неделе</span>}
-                </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: GREEN, letterSpacing: "-0.04em", lineHeight: 1 }}>
+                {fmtK(totalEarnings)} <span style={{ fontSize: 16, fontWeight: 600 }}>₽</span>
               </div>
+              {thisWeekEarnings > 0 && (
+                <div style={{ fontSize: 11, color: FG_DIM, marginTop: 5 }}>
+                  {fmtK(thisWeekEarnings)} ₽ на этой неделе
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          {/* ── 3-col mini stats ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 14 }}>
+          {/* ── 3 stats ── */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+              Смены в {MONTH_NAMES[currentMonth.getMonth()].toLowerCase()}е
+            </div>
             {[
-              { n: confirmedN,  label: "ОК",    color: GREEN,  bg: "rgba(16,185,129,0.07)",  border: "rgba(16,185,129,0.15)" },
-              { n: pendingN,    label: "WAIT",  color: AMBER,  bg: "rgba(245,158,11,0.07)",  border: "rgba(245,158,11,0.15)" },
-              { n: overdueN,    label: "OVER",  color: RED_C,  bg: "rgba(239,68,68,0.07)",   border: "rgba(239,68,68,0.15)" },
-            ].map(({ n, label, color, bg, border }) => (
-              <div key={label} style={{
-                background: bg, border: `1px solid ${border}`,
-                borderRadius: 12, padding: "10px 10px 9px",
-                display: "flex", flexDirection: "column", alignItems: "center",
-              }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: "-0.05em", lineHeight: 1 }}>{n}</div>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(226,232,240,0.25)", marginTop: 4, letterSpacing: "0.08em" }}>{label}</div>
+              { n: plannedN,   label: "запланировано",  color: BLUE  },
+              { n: confirmedN, label: "подтверждено",   color: GREEN },
+              { n: pastN,      label: "прошедших",      color: SLATE },
+            ].map(({ n, label, color }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }}/>
+                  <span style={{ fontSize: 12, color: FG_MED }}>{label}</span>
+                </div>
+                <span style={{ fontSize: 16, fontWeight: 700, color, letterSpacing: "-0.03em" }}>{n}</span>
               </div>
             ))}
           </div>
 
           {/* divider */}
-          <div style={{ height: "1px", background: BORDER, margin: "2px 0 14px" }}/>
+          <div style={{ height: 1, background: BORDER, marginBottom: 18 }}/>
 
           {/* ── Upcoming shifts ── */}
           {(() => {
             const todayStr = format(new Date(), "yyyy-MM-dd");
             const upcoming = events
-              .filter(e => e.date >= todayStr)
+              .filter(e => e.date >= todayStr && (e.status === "planned" || e.status === "pending" || e.status === "confirmed"))
               .sort((a, b) => a.date.localeCompare(b.date))
-              .slice(0, 4);
+              .slice(0, 5);
             return (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: FG_DIM, letterSpacing: "0.09em", textTransform: "uppercase" }}>
-                    Ближайшие
-                  </span>
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+                  Ближайшие смены
                 </div>
                 {upcoming.length === 0
-                  ? <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет смен</p>
+                  ? <p style={{ fontSize: 11, color: FG_DIM }}>Нет запланированных смен</p>
                   : upcoming.map(ev => {
                     const d = parseISO(ev.date);
-                    const isConf = ev.status === "confirmed";
-                    const dotColor = isConf ? GREEN : AMBER;
                     const eName = entities.find(e => e.id === ev.entityId)?.name ?? "—";
+                    const dotColor = ev.status === "confirmed" ? GREEN : BLUE;
                     return (
                       <div key={ev.id} style={{
                         display: "flex", alignItems: "center", gap: 10,
-                        padding: "7px 10px", borderRadius: 10,
-                        background: "rgba(255,255,255,0.02)",
-                        border: `1px solid ${BORDER}`,
-                        marginBottom: 5,
-                        transition: "background 0.15s",
+                        padding: "8px 0", borderBottom: `1px solid ${BORDER}`,
                       }}>
                         <div style={{
-                          flexShrink: 0, width: 34, textAlign: "center",
-                          borderRight: `1px solid ${BORDER}`, paddingRight: 10,
+                          flexShrink: 0, minWidth: 32,
                         }}>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: FG, letterSpacing: "-0.04em", lineHeight: 1 }}>{format(d, "d")}</div>
-                          <div style={{ fontSize: 8, color: FG_DIM, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: FG, letterSpacing: "-0.03em", lineHeight: 1 }}>{format(d, "d")}</div>
+                          <div style={{ fontSize: 9, color: FG_DIM, marginTop: 2, textTransform: "uppercase" }}>
                             {DAY_SHORT[d.getDay()]}
                           </div>
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 11, fontWeight: 500, color: "rgba(226,232,240,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ fontSize: 12, color: FG_MED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {eName}
                           </div>
-                          {ev.assignee && ev.assignee !== "—" && (
-                            <div style={{ fontSize: 10, color: FG_DIM, marginTop: 1 }}>{ev.assignee}</div>
-                          )}
+                          <div style={{ fontSize: 10, color: FG_DIM, marginTop: 1 }}>09:00 – 21:00</div>
                         </div>
                         <div style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }}/>
                       </div>
@@ -560,101 +490,30 @@ export default function Home() {
               </div>
             );
           })()}
-
-          {/* divider */}
-          <div style={{ height: "1px", background: BORDER, margin: "2px 0 14px" }}/>
-
-          {/* ── Staff leaderboard ── */}
-          {(() => {
-            const map: Record<string, number> = {};
-            events.forEach(e => {
-              if (e.assignee && e.assignee !== "—") map[e.assignee] = (map[e.assignee] ?? 0) + 1;
-            });
-            const staff = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
-            const max = staff[0]?.[1] ?? 1;
-            return (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: FG_DIM, letterSpacing: "0.09em", textTransform: "uppercase" }}>
-                    Топ сотрудников
-                  </span>
-                  {staff.length > 0 && (
-                    <span style={{
-                      fontSize: 9, color: FG_DIM,
-                      background: "rgba(255,255,255,0.04)",
-                      border: `1px solid ${BORDER}`, borderRadius: 99, padding: "1px 7px",
-                    }}>{staff.length}</span>
-                  )}
-                </div>
-                {staff.length === 0
-                  ? <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет данных</p>
-                  : staff.map(([name, cnt], i) => {
-                    const ac = avatarColor(name);
-                    const initials = name.split(" ").map(p => p[0]).join("").slice(0,2).toUpperCase();
-                    return (
-                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
-                        {/* Rank */}
-                        <div style={{ width: 14, textAlign: "right", fontSize: 9, color: FG_DIM, flexShrink: 0, fontWeight: 600 }}>
-                          {i + 1}
-                        </div>
-                        {/* Avatar */}
-                        <div style={{
-                          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
-                          background: `${ac}22`,
-                          border: `1px solid ${ac}44`,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 9, fontWeight: 700, color: ac, letterSpacing: "0.02em",
-                        }}>
-                          {initials}
-                        </div>
-                        {/* Name + bar */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                            <span style={{ fontSize: 11, color: "rgba(226,232,240,0.72)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{name}</span>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: ac, flexShrink: 0, marginLeft: 4 }}>{cnt}</span>
-                          </div>
-                          <div style={{ height: 2, borderRadius: 99, background: "rgba(255,255,255,0.05)" }}>
-                            <div style={{
-                              height: "100%",
-                              width: `${(cnt / max) * 100}%`,
-                              background: `linear-gradient(90deg, ${ac}aa, ${ac})`,
-                              borderRadius: 99, transition: "width 0.4s ease",
-                            }}/>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                }
-              </div>
-            );
-          })()}
         </div>
 
-        {/* ── Footer: Add entity ── */}
-        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        {/* ── Footer: Add location ── */}
+        <div style={{ padding: "12px 16px 16px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <button
             onClick={() => setShowAddRow(true)}
             style={{
-              width: "100%", padding: "9px 0", borderRadius: 10,
+              width: "100%", padding: "8px 0", borderRadius: 8,
               background: "transparent",
-              border: `1px dashed rgba(255,255,255,0.1)`,
+              border: `1px dashed ${BORDER}`,
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              gap: 7, color: FG_DIM, fontSize: 12, fontWeight: 500, transition: "all 0.18s",
+              gap: 7, color: FG_DIM, fontSize: 12, transition: "all 0.15s",
             }}
             onMouseEnter={e => {
               const b = e.currentTarget as HTMLButtonElement;
-              b.style.borderColor = `${VIOLET}66`;
-              b.style.color = VIOLET;
-              b.style.background = `${VIOLET}0d`;
+              b.style.borderColor = BLUE;
+              b.style.color = BLUE;
             }}
             onMouseLeave={e => {
               const b = e.currentTarget as HTMLButtonElement;
-              b.style.borderColor = "rgba(255,255,255,0.1)";
+              b.style.borderColor = BORDER;
               b.style.color = FG_DIM;
-              b.style.background = "transparent";
             }}>
-            <Plus style={{ width: 13, height: 13 }}/>
+            <Plus style={{ width: 12, height: 12 }}/>
             Добавить объект
           </button>
         </div>
@@ -664,46 +523,39 @@ export default function Home() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* ── Topbar ── */}
-        <div className="topbar-glass" style={{
+        <div style={{
           height: 48, flexShrink: 0,
           display: "flex", alignItems: "center",
           padding: "0 18px", gap: 0,
           position: "relative", zIndex: 10,
+          background: PANEL,
+          borderBottom: `1px solid ${BORDER}`,
         }}>
-          {/* Stat chips */}
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
-            <div className="stat-chip" style={{ color: FG_MED, borderColor: BORDER, background: "rgba(255,255,255,0.025)" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: FG, letterSpacing: "-0.02em" }}>{entities.length}</span>
-              <span>объект{entities.length === 1 ? "" : entities.length < 5 ? "а" : "ов"}</span>
-            </div>
-            <div className="stat-chip" style={{ color: GREEN, borderColor: "rgba(16,185,129,0.2)", background: "rgba(16,185,129,0.06)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: GREEN, flexShrink: 0 }}/>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>{confirmedN}</span>
-              <span style={{ color: "rgba(16,185,129,0.65)" }}>подтверждено</span>
-            </div>
-            <div className="stat-chip" style={{ color: AMBER, borderColor: "rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.05)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: AMBER, flexShrink: 0 }}/>
-              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>{pendingN}</span>
-              <span style={{ color: "rgba(245,158,11,0.65)" }}>ожидание</span>
-            </div>
-            {overdueN > 0 && (
-              <div className="stat-chip" style={{ color: RED_C, borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED_C, flexShrink: 0 }}/>
-                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>{overdueN}</span>
-                <span style={{ color: "rgba(239,68,68,0.65)" }}>просрочено</span>
-              </div>
-            )}
+          {/* Stats */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 18 }}>
+            <span style={{ fontSize: 12, color: FG_MED }}>
+              <span style={{ fontWeight: 700, color: FG }}>{entities.length}</span>{" "}
+              объект{entities.length === 1 ? "" : entities.length < 5 ? "а" : "ов"}
+            </span>
+            <span style={{ width: 1, height: 12, background: BORDER, flexShrink: 0 }}/>
+            <span style={{ fontSize: 12, color: FG_MED }}>
+              <span style={{ fontWeight: 700, color: BLUE }}>{plannedN}</span>{" "}запланировано
+            </span>
+            <span style={{ width: 1, height: 12, background: BORDER, flexShrink: 0 }}/>
+            <span style={{ fontSize: 12, color: FG_MED }}>
+              <span style={{ fontWeight: 700, color: GREEN }}>{confirmedN}</span>{" "}подтверждено
+            </span>
           </div>
 
-          {/* Action buttons */}
+          {/* Buttons */}
           <div style={{ display: "flex", gap: 6 }}>
             <button onClick={() => setShowFinance(v => !v)}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 500,
-                border: showFinance ? "1px solid rgba(167,139,250,0.35)" : `1px solid ${BORDER}`,
-                background: showFinance ? "rgba(139,92,246,0.1)" : "rgba(255,255,255,0.025)",
-                color: showFinance ? "#a78bfa" : FG_MED, cursor: "pointer", transition: "all 0.18s",
+                padding: "5px 12px", borderRadius: 7, fontSize: 12,
+                border: `1px solid ${showFinance ? BLUE + "55" : BORDER}`,
+                background: showFinance ? BLUE + "14" : "transparent",
+                color: showFinance ? BLUE : FG_MED, cursor: "pointer", transition: "all 0.15s",
               }}>
               <Wallet style={{ width: 12, height: 12 }}/>
               Финансы
@@ -711,10 +563,10 @@ export default function Home() {
             <button onClick={() => setTlCollapsed(v => !v)}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 500,
-                border: !tlCollapsed ? `1px solid ${VIOLET}55` : `1px solid ${BORDER}`,
-                background: !tlCollapsed ? `${VIOLET}14` : "rgba(255,255,255,0.025)",
-                color: !tlCollapsed ? VIOLET : FG_MED, cursor: "pointer", transition: "all 0.18s",
+                padding: "5px 12px", borderRadius: 7, fontSize: 12,
+                border: `1px solid ${!tlCollapsed ? BLUE + "55" : BORDER}`,
+                background: !tlCollapsed ? BLUE + "14" : "transparent",
+                color: !tlCollapsed ? BLUE : FG_MED, cursor: "pointer", transition: "all 0.15s",
               }}>
               <Clock style={{ width: 12, height: 12 }}/>
               Таймлайн
@@ -801,15 +653,15 @@ export default function Home() {
                             }}>
                               {DAY_SHORT[day.getDay()]}
                             </span>
-                            <span className={tod ? "today-pill" : ""}
+                            <span
                               style={{
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 width: tod ? 22 : 18, height: tod ? 22 : 18,
                                 borderRadius: tod ? 8 : 5,
                                 fontSize: tod ? 10 : 9,
-                                fontWeight: tod ? 900 : 500,
-                                background: tod ? VIOLET : "transparent",
-                                color: tod ? "#fff" : wknd ? "rgba(226,232,240,0.18)" : "rgba(226,232,240,0.5)",
+                                fontWeight: tod ? 700 : 500,
+                                background: tod ? BLUE : "transparent",
+                                color: tod ? "#fff" : wknd ? FG_DIM : FG_MED,
                                 transition: "all 0.2s",
                               }}>
                               {format(day, "d")}
@@ -828,19 +680,19 @@ export default function Home() {
                         style={{ background: "transparent", padding: "80px 0", textAlign: "center" }}>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
                           <div style={{
-                            width: 56, height: 56, borderRadius: 18,
-                            background: "rgba(139,92,246,0.07)",
-                            border: `1px solid rgba(139,92,246,0.18)`,
+                            width: 52, height: 52, borderRadius: 16,
+                            background: `${BLUE}14`,
+                            border: `1px solid ${BLUE}33`,
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
-                            <CalendarDays style={{ width: 24, height: 24, color: VIOLET }}/>
+                            <CalendarDays style={{ width: 22, height: 22, color: BLUE }}/>
                           </div>
-                          <p style={{ fontSize: 14, color: "rgba(226,232,240,0.35)", fontWeight: 600 }}>Нет объектов</p>
+                          <p style={{ fontSize: 14, color: FG_MED, fontWeight: 600 }}>Нет объектов</p>
                           <button data-testid="btn-demo" onClick={loadDemoData}
                             style={{
-                              fontSize: 12, padding: "8px 20px", borderRadius: 10, fontWeight: 600,
-                              background: `${VIOLET}18`, color: VIOLET,
-                              border: `1px solid ${VIOLET}44`, cursor: "pointer",
+                              fontSize: 12, padding: "7px 18px", borderRadius: 8, fontWeight: 600,
+                              background: `${BLUE}18`, color: BLUE,
+                              border: `1px solid ${BLUE}44`, cursor: "pointer",
                             }}>
                             Загрузить демо-данные
                           </button>
@@ -886,7 +738,7 @@ export default function Home() {
                         <div style={{
                           display: "flex", alignItems: "center", gap: 8,
                           height: "100%", paddingLeft: 12,
-                          borderLeft: `2px solid ${VIOLET}`,
+                          borderLeft: `2px solid ${BLUE}`,
                         }}>
                           <input ref={addRowRef} data-testid="input-new-entity"
                             value={newEntityName}
@@ -898,7 +750,7 @@ export default function Home() {
                             placeholder="Название объекта..."
                             style={{ flex: 1, minWidth: 0, fontSize: 12, background: "transparent", outline: "none", border: "none", color: FG, letterSpacing: "-0.01em" }}/>
                           <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
-                            style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: VIOLET, color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.35, fontWeight: 600 }}>
+                            style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: BLUE, color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.35, fontWeight: 600 }}>
                             Добавить
                           </button>
                           <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
@@ -1092,20 +944,25 @@ function EntityRow({
     setEditing(false);
   };
 
-  const BASE_R   = "#030712";
-  const VIOLET_R = "#8b5cf6";
-  const GREEN_R  = "#10b981";
-  const AMBER_R  = "#f59e0b";
-  const FG_R     = "rgba(226,232,240,0.9)";
-  const FG_D_R   = "rgba(226,232,240,0.28)";
+  const BASE_R  = "#0f1219";
+  const BLUE_R  = "#5b9cf6";
+  const GREEN_R = "#3ecf8e";
+  const SLATE_R = "#546070";
+  const FG_R    = "#c2cfdc";
+  const FG_D_R  = "#374557";
 
-  const CELL_CONF_BG  = "rgba(16,185,129,0.1)";
-  const CELL_PEND_BG  = "rgba(245,158,11,0.08)";
-  const CELL_DRAG_BG  = "rgba(139,92,246,0.2)";
+  const CELL_PLANNED_BG   = "rgba(91,156,246,0.13)";
+  const CELL_CONFIRMED_BG = "rgba(62,207,142,0.1)";
+  const CELL_PAST_BG      = "rgba(84,96,112,0.14)";
+  const CELL_DRAG_BG      = "rgba(91,156,246,0.22)";
 
   const STATUS_TOP: Record<string, string> = {
+    planned:   BLUE_R,
     confirmed: GREEN_R,
-    pending:   AMBER_R,
+    past:      SLATE_R,
+    // compat
+    pending:   BLUE_R,
+    overdue:   SLATE_R,
   };
 
   return (
@@ -1135,7 +992,7 @@ function EntityRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
               }}
-              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: `1px solid ${VIOLET_R}`, color: FG_R, minWidth: 0, letterSpacing: "-0.01em" }}/>
+              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: `1px solid ${BLUE_R}`, color: FG_R, minWidth: 0, letterSpacing: "-0.01em" }}/>
           ) : (
             <span className="entity-name"
               onDoubleClick={() => setEditing(true)}
@@ -1185,17 +1042,21 @@ function EntityRow({
 
         if (isDragTarget) {
           cellBg = CELL_DRAG_BG;
-          topBorder = VIOLET_R;
+          topBorder = BLUE_R;
         } else if (firstEv) {
-          const isConf = firstEv.status === "confirmed";
-          cellBg = isConf ? CELL_CONF_BG : CELL_PEND_BG;
-          topBorder = STATUS_TOP[firstEv.status];
-          topShadow = isConf
-            ? "inset 0 2px 0 rgba(16,185,129,0.5)"
-            : "inset 0 2px 0 rgba(245,158,11,0.45)";
+          const s = firstEv.status;
+          cellBg = s === "confirmed" ? CELL_CONFIRMED_BG
+                 : s === "past" || s === "overdue" ? CELL_PAST_BG
+                 : CELL_PLANNED_BG;
+          topBorder = STATUS_TOP[s] ?? BLUE_R;
+          topShadow = s === "confirmed"
+            ? "inset 0 2px 0 rgba(62,207,142,0.4)"
+            : s === "past" || s === "overdue"
+            ? "inset 0 2px 0 rgba(84,96,112,0.4)"
+            : "inset 0 2px 0 rgba(91,156,246,0.4)";
           cellClass = "";
         } else if (tod) {
-          cellClass = "cell-today-empty";
+          cellClass = "today-col";
         } else if (wknd) {
           cellClass = "cell-weekend";
         }
@@ -1505,8 +1366,6 @@ function GridCell({
   /* ── Multi-event cell — pure color square, small dot badge, details on hover ── */
   if (events.length > 1) {
     const first = events[0];
-    const hasTime = !!(first.startTime && first.endTime);
-    const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
     return (
       <>
         <div ref={ref} data-testid={`cell-event-${entityId}-${date}`}
@@ -1522,11 +1381,10 @@ function GridCell({
           }}
           onContextMenu={e => onContextMenu(e.nativeEvent, first)}
           style={{ width: "100%", height: "100%", cursor: "grab", position: "relative", borderRadius: "2px", transition: "filter 0.08s" }}>
-          {/* Small dot to indicate multiple events */}
           <span style={{ position: "absolute", top: 1, right: 1, width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.55)" }}/>
         </div>
         {hoverCard && (
-          <EventInfoCard event={first} dur={dur} anchorEl={ref.current}
+          <EventInfoCard event={first} anchorEl={ref.current}
             onEnter={showCard} onLeave={hideCard} onDoneToggle={onDoneToggle}/>
         )}
       </>
@@ -1535,8 +1393,6 @@ function GridCell({
 
   /* ── Single event — pure color square, details on hover ── */
   const first = events[0];
-  const hasTime = !!(first.startTime && first.endTime);
-  const dur = hasTime ? calcDuration(first.startTime!, first.endTime!) : "";
 
   return (
     <>
@@ -1567,7 +1423,6 @@ function GridCell({
       {hoverCard && (
         <EventInfoCard
           event={first}
-          dur={dur}
           anchorEl={ref.current}
           onEnter={showCard}
           onLeave={hideCard}
@@ -1580,18 +1435,16 @@ function GridCell({
 
 /* ─────────────────────── EventInfoCard (replaces tooltip) ─────────────────────── */
 function EventInfoCard({
-  event, dur, anchorEl, onEnter, onLeave, onDoneToggle,
+  event, anchorEl, onEnter, onLeave, onDoneToggle,
 }: {
   event: PlannerEvent;
-  dur: string;
   anchorEl: HTMLElement | null;
   onEnter: () => void;
   onLeave: () => void;
   onDoneToggle: (ev: PlannerEvent) => void;
 }) {
-  const color   = STATUS_COLORS[event.status];
-  const hasTime = !!(event.startTime && event.endTime);
-  const earn    = event.earnings ?? 0;
+  const color = STATUS_COLORS[event.status];
+  const earn  = event.earnings ?? 0;
   const exp     = event.expenses ?? 0;
   const net     = earn - exp;
 
@@ -1643,33 +1496,12 @@ function EventInfoCard({
           </div>
         </div>
 
-        {/* Assignee */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-            style={{ backgroundColor: color }}>
-            {event.assignee.split(" ").map(p => p[0]).join("").slice(0,2).toUpperCase() || "?"}
-          </div>
-          <span className="text-[11px] text-foreground/80">{event.assignee}</span>
+          {/* Fixed time info */}
+        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-accent/40 border border-border/40">
+          <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0"/>
+          <span className="text-[11px] font-semibold text-foreground">09:00 – 21:00</span>
+          <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">12 ч</span>
         </div>
-
-        {/* Time */}
-        {hasTime && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-accent/40 border border-border/40">
-            <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0"/>
-            <span className="text-[11px] font-semibold text-foreground">
-              {event.startTime} → {event.endTime}
-            </span>
-            {dur && (
-              <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                style={{ backgroundColor: `${color}25`, color }}>
-                {dur}
-              </span>
-            )}
-          </div>
-        )}
-        {!hasTime && (
-          <p className="text-[10px] text-muted-foreground/50 italic">Время не указано</p>
-        )}
 
         {/* Notes */}
         {event.notes && (
@@ -1837,22 +1669,16 @@ function TimePicker({ startTime, endTime, onStartChange, onEndChange }: {
 }
 
 /* ─────────────────────── AddEventPopup ─────────────────────── */
-function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: {
+function AddEventPopup({ entityId, date, existingEvents: _existingEvents, onClose, onAdd }: {
   entityId: string; date: string;
   existingEvents: PlannerEvent[];
   onClose: () => void;
   onAdd: (ev: PlannerEvent) => void;
 }) {
-  const [title,     setTitle]     = useState("");
-  const [assignee,  setAssignee]  = useState("");
-  const [status,    setStatus]    = useState<EventStatus>("pending");
-  const [notes,     setNotes]     = useState("");
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime,   setEndTime]   = useState("10:00");
-  const [useTime,   setUseTime]   = useState(false);
-  const [icon,      setIcon]      = useState<EventIcon>("none");
-  const [earnings,  setEarnings]  = useState<string>("");
-  const [expenses,  setExpenses]  = useState<string>("");
+  const [title,    setTitle]    = useState("");
+  const [status,   setStatus]   = useState<EventStatus>("planned");
+  const [notes,    setNotes]    = useState("");
+  const [earnings, setEarnings] = useState<string>("");
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -1860,37 +1686,23 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: {
     try { return format(parseISO(date), "d MMMM yyyy", { locale: ru }); } catch { return date; }
   })();
 
-  const conflict = useTime && startTime && endTime
-    ? existingEvents.find(e =>
-        e.startTime && e.endTime &&
-        hasTimeOverlap(startTime, endTime, e.startTime, e.endTime)
-      )
-    : undefined;
-
-  const canSubmit = !!title.trim() && !conflict;
-
   const submit = () => {
-    if (!canSubmit) return;
     onAdd({
       id: genId(), entityId, date, status,
-      title: title.trim(),
-      assignee: assignee.trim() || "—",
-      notes: notes.trim() || undefined,
-      startTime: useTime ? startTime : undefined,
-      endTime:   useTime ? endTime   : undefined,
-      icon:     icon !== "none" ? icon : undefined,
+      title:    title.trim() || undefined,
+      notes:    notes.trim() || undefined,
       earnings: earnings ? parseFloat(earnings) : undefined,
-      expenses: expenses ? parseFloat(expenses) : undefined,
-    });
+    } as PlannerEvent);
   };
 
   return (
     <div className="rounded-xl border border-border bg-popover shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
       <div className="h-0.5 transition-colors" style={{ backgroundColor: STATUS_COLORS[status] }}/>
       <div className="p-4">
-        <div className="flex items-center justify-between mb-3">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm font-semibold">Новое событие</p>
+            <p className="text-sm font-semibold text-foreground">Новая смена</p>
             <p className="text-[11px] text-muted-foreground mt-0.5">{dateLabel}</p>
           </div>
           <button onClick={onClose} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent">
@@ -1898,91 +1710,54 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: {
           </button>
         </div>
 
-        <div className="space-y-2">
-          <input ref={titleRef} data-testid="input-event-title"
-            value={title} onChange={e => setTitle(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") submit(); }}
-            placeholder="Название события"
-            className="w-full text-sm bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
-          <input data-testid="input-event-assignee"
-            value={assignee} onChange={e => setAssignee(e.target.value)}
-            placeholder="Ответственный"
-            className="w-full text-sm bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
-
-          <div>
-            <button
-              data-testid="btn-toggle-time"
-              onClick={() => setUseTime(v => !v)}
-              className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all
-                ${useTime ? "border-primary/50 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-              <Clock className="w-3 h-3"/>
-              {useTime ? "Время указано" : "Добавить время"}
-            </button>
-
-            {useTime && (
-              <div className="mt-2 space-y-2">
-                <TimePicker
-                  startTime={startTime} endTime={endTime}
-                  onStartChange={setStartTime} onEndChange={setEndTime}
-                />
-                {conflict && (
-                  <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-destructive/10 border border-destructive/30">
-                    <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0 mt-0.5"/>
-                    <div>
-                      <p className="text-[10px] font-semibold text-destructive leading-tight">Конфликт времени</p>
-                      <p className="text-[9px] text-destructive/80 mt-0.5 leading-tight">
-                        Пересекается с «{conflict.title}»{conflict.startTime ? ` (${conflict.startTime}–${conflict.endTime})` : ""}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+        <div className="space-y-2.5">
+          {/* Fixed time display */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/40 border border-border/60">
+            <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0"/>
+            <span className="text-xs font-medium text-foreground">09:00 – 21:00</span>
+            <span className="ml-auto text-[10px] font-bold text-primary">12 ч</span>
           </div>
 
+          {/* Title (optional) */}
+          <input ref={titleRef} data-testid="input-event-title"
+            value={title} onChange={e => setTitle(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }}
+            placeholder="Заметка к смене (необязательно)"
+            className="w-full text-sm bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
+
+          {/* Status */}
           <div className="flex gap-1.5">
             {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
               <button key={s} data-testid={`btn-status-${s}`}
                 onClick={() => setStatus(s)}
-                className={`flex-1 text-[10px] font-semibold py-1 rounded-md transition-all border
-                  ${status === s ? "text-white border-transparent scale-105" : "border-border text-muted-foreground hover:border-border/80"}`}
+                className={`flex-1 text-[10px] font-semibold py-1.5 rounded-md transition-all border
+                  ${status === s ? "text-white border-transparent" : "border-border text-muted-foreground hover:border-border/80"}`}
                 style={status === s ? { backgroundColor: STATUS_COLORS[s] } : {}}>
                 {STATUS_LABELS[s]}
               </button>
             ))}
           </div>
 
+          {/* Earnings */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
+            <input
+              type="number" min="0" step="100"
+              value={earnings} onChange={e => setEarnings(e.target.value)}
+              placeholder="Заработок за смену"
+              className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-7 pr-3 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+          </div>
+
+          {/* Notes */}
           <textarea data-testid="input-event-notes"
             value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="Заметки (необязательно)" rows={2}
+            placeholder="Примечания..." rows={2}
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors resize-none"/>
-
-          <IconPicker value={icon} onChange={setIcon}/>
-
-          {/* Earnings + Expenses row */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
-              <input
-                type="number" min="0" step="100"
-                value={earnings} onChange={e => setEarnings(e.target.value)}
-                placeholder="Заработок"
-                className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
-            </div>
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400 text-xs font-bold">−</span>
-              <input
-                type="number" min="0" step="100"
-                value={expenses} onChange={e => setExpenses(e.target.value)}
-                placeholder="Траты"
-                className="w-full text-xs bg-accent/40 border border-rose-500/20 rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-rose-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
-            </div>
-          </div>
         </div>
 
-        <button data-testid="btn-save-event" onClick={submit} disabled={!canSubmit}
-          className="w-full mt-3 text-xs font-semibold py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-          Добавить событие
+        <button data-testid="btn-save-event" onClick={submit}
+          className="w-full mt-3 text-xs font-semibold py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+          Добавить смену
         </button>
         <p className="text-[10px] text-muted-foreground/60 text-center mt-2">Enter — сохранить · Esc — закрыть</p>
       </div>
@@ -1991,7 +1766,7 @@ function AddEventPopup({ entityId, date, existingEvents, onClose, onAdd }: {
 }
 
 /* ─────────────────────── ViewPopup ─────────────────────── */
-function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, onSave, onDuplicate }: {
+function ViewPopup({ event, existingEvents: _existingEvents, onClose, onStatusChange, onDelete, onSave, onDuplicate }: {
   event: PlannerEvent;
   existingEvents: PlannerEvent[];
   onClose: () => void;
@@ -2000,47 +1775,25 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
   onSave: (upd: PlannerEvent) => void;
   onDuplicate: (date: string) => void;
 }) {
-  const [editTitle,    setEditTitle]    = useState(event.title);
-  const [editAssignee, setEditAssignee] = useState(event.assignee);
+  const [editTitle,    setEditTitle]    = useState(event.title ?? "");
   const [editNotes,    setEditNotes]    = useState(event.notes ?? "");
-  const [startTime,    setStartTime]    = useState(event.startTime ?? "");
-  const [endTime,      setEndTime]      = useState(event.endTime ?? "");
-  const [editIcon,     setEditIcon]     = useState<EventIcon>(event.icon ?? "none");
   const [editEarnings, setEditEarnings] = useState<string>(event.earnings != null ? String(event.earnings) : "");
-  const [editExpenses, setEditExpenses] = useState<string>(event.expenses != null ? String(event.expenses) : "");
   const [dupMode,      setDupMode]      = useState(false);
   const [dupDate,      setDupDate]      = useState<string>(format(new Date(), "yyyy-MM-dd"));
-  const [dirty, setDirty] = useState(false);
+  const [dirty,        setDirty]        = useState(false);
 
   const dateLabel = (() => {
     try { return format(parseISO(event.date), "d MMMM yyyy", { locale: ru }); } catch { return event.date; }
   })();
 
-  const initials = event.assignee.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase() || "?";
-  const dur = startTime && endTime ? calcDuration(startTime, endTime) : "";
-
-  const conflict = startTime && endTime
-    ? existingEvents.find(e =>
-        e.id !== event.id &&
-        e.startTime && e.endTime &&
-        hasTimeOverlap(startTime, endTime, e.startTime, e.endTime)
-      )
-    : undefined;
-
   const mark = () => setDirty(true);
 
   const save = () => {
-    if (!editTitle.trim() || conflict) return;
     onSave({
       ...event,
-      title:     editTitle.trim(),
-      assignee:  editAssignee.trim() || "—",
-      notes:     editNotes.trim() || undefined,
-      startTime: startTime || undefined,
-      endTime:   endTime   || undefined,
-      icon:      editIcon !== "none" ? editIcon : undefined,
-      earnings:  editEarnings ? parseFloat(editEarnings) : undefined,
-      expenses:  editExpenses ? parseFloat(editExpenses) : undefined,
+      title:    editTitle.trim() || undefined,
+      notes:    editNotes.trim() || undefined,
+      earnings: editEarnings ? parseFloat(editEarnings) : undefined,
     });
   };
 
@@ -2048,103 +1801,65 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
     <div className="rounded-xl border border-border bg-popover shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
       <div className="h-0.5" style={{ backgroundColor: STATUS_COLORS[event.status] }}/>
       <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: STATUS_COLORS[event.status] }}>
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium truncate">{event.assignee}</p>
-              <p className="text-[10px] text-muted-foreground">{dateLabel}</p>
-            </div>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{dateLabel}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">09:00 – 21:00 · 12 ч</p>
           </div>
           <button onClick={onClose} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent flex-shrink-0">
             <X className="w-3.5 h-3.5"/>
           </button>
         </div>
 
-        <div className="space-y-2 mb-3">
+        <div className="space-y-2.5 mb-3">
+          {/* Status row */}
+          <div className="flex gap-1.5">
+            {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
+              <button key={s}
+                onClick={() => onStatusChange(s)}
+                className={`flex-1 text-[10px] font-semibold py-1.5 rounded-md transition-all border
+                  ${event.status === s ? "text-white border-transparent" : "border-border text-muted-foreground hover:border-border/80"}`}
+                style={event.status === s ? { backgroundColor: STATUS_COLORS[s] } : {}}>
+                {STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
+
+          {/* Title */}
           <input value={editTitle} onChange={e => { setEditTitle(e.target.value); mark(); }}
-            className="w-full text-sm font-medium bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground transition-colors"/>
-          <input value={editAssignee} onChange={e => { setEditAssignee(e.target.value); mark(); }}
-            placeholder="Ответственный"
-            className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
+            placeholder="Заметка к смене (необязательно)"
+            className="w-full text-sm bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors"/>
 
-          <TimePicker
-            startTime={startTime} endTime={endTime}
-            onStartChange={v => { setStartTime(v); mark(); }}
-            onEndChange={v => { setEndTime(v); mark(); }}
-          />
-          {conflict && (
-            <div className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-destructive/10 border border-destructive/30">
-              <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0 mt-0.5"/>
-              <div>
-                <p className="text-[10px] font-semibold text-destructive leading-tight">Конфликт времени</p>
-                <p className="text-[9px] text-destructive/80 mt-0.5 leading-tight">
-                  Пересекается с «{conflict.title}»{conflict.startTime ? ` (${conflict.startTime}–${conflict.endTime})` : ""}
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Earnings */}
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
+            <input
+              type="number" min="0" step="100"
+              value={editEarnings} onChange={e => { setEditEarnings(e.target.value); mark(); }}
+              placeholder="Заработок за смену"
+              className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-7 pr-3 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
+          </div>
 
+          {/* Notes */}
           <textarea value={editNotes} onChange={e => { setEditNotes(e.target.value); mark(); }}
-            placeholder="Заметки..."
+            placeholder="Примечания..."
             rows={2}
             className="w-full text-xs bg-accent/40 border border-border rounded-lg px-3 py-1.5 outline-none focus:border-primary text-foreground placeholder:text-muted-foreground transition-colors resize-none"/>
-
-          <IconPicker value={editIcon} onChange={v => { setEditIcon(v); mark(); }}/>
-
-          {/* Earnings + Expenses row */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-emerald-400 text-xs font-bold">₽</span>
-              <input
-                type="number" min="0" step="100"
-                value={editEarnings} onChange={e => { setEditEarnings(e.target.value); mark(); }}
-                placeholder="Заработок"
-                className="w-full text-xs bg-accent/40 border border-border rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-emerald-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
-            </div>
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-rose-400 text-xs font-bold">−</span>
-              <input
-                type="number" min="0" step="100"
-                value={editExpenses} onChange={e => { setEditExpenses(e.target.value); mark(); }}
-                placeholder="Траты"
-                className="w-full text-xs bg-accent/40 border border-rose-500/20 rounded-lg pl-6 pr-2 py-1.5 outline-none focus:border-rose-500/60 text-foreground placeholder:text-muted-foreground transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"/>
-            </div>
-          </div>
         </div>
 
-        <div className="flex gap-1.5 mb-3">
-          {(Object.keys(STATUS_LABELS) as EventStatus[]).map(s => (
-            <button key={s}
-              onClick={() => onStatusChange(s)}
-              className={`flex-1 text-[10px] font-semibold py-1 rounded-md transition-all border
-                ${event.status === s ? "text-white border-transparent" : "border-border text-muted-foreground hover:border-border/70"}`}
-              style={event.status === s ? { backgroundColor: STATUS_COLORS[s] } : {}}>
-              {STATUS_LABELS[s]}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
+        {/* Save / Delete row */}
+        <div className="flex items-center gap-2 mb-2">
           {dirty ? (
-            <button onClick={save} disabled={!!conflict}
-              className="flex-1 text-xs font-semibold py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+            <button onClick={save}
+              className="flex-1 text-xs font-semibold py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center justify-center gap-1">
               <Check className="w-3 h-3"/> Сохранить
             </button>
           ) : (
-            <>
-              <button onClick={() => onStatusChange("pending")}
-                className="flex-1 text-xs py-1.5 rounded-lg border border-border text-foreground hover:bg-accent transition-colors flex items-center justify-center gap-1">
-                <RotateCcw className="w-3 h-3"/> Перенести
-              </button>
-              <button onClick={() => onStatusChange("confirmed")}
-                className="flex-1 text-xs py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 transition-colors flex items-center justify-center gap-1">
-                <Check className="w-3 h-3"/> Подтвердить
-              </button>
-            </>
+            <button onClick={() => onStatusChange("planned")}
+              className="flex-1 text-xs py-1.5 rounded-lg border border-border text-foreground hover:bg-accent transition-colors flex items-center justify-center gap-1">
+              <RotateCcw className="w-3 h-3"/> Запланировать снова
+            </button>
           )}
           <button onClick={onDelete}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent transition-colors flex-shrink-0">
@@ -2152,7 +1867,8 @@ function ViewPopup({ event, existingEvents, onClose, onStatusChange, onDelete, o
           </button>
         </div>
 
-        <div className="mt-2 border-t border-border pt-2">
+        {/* Duplicate */}
+        <div className="border-t border-border pt-2">
           {!dupMode ? (
             <button onClick={() => setDupMode(true)}
               className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg py-1.5 transition-colors">

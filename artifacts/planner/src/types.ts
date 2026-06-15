@@ -1,4 +1,4 @@
-export type EventStatus = "confirmed" | "pending";
+export type EventStatus = "planned" | "confirmed" | "past";
 
 export interface Entity {
   id: string;
@@ -6,12 +6,10 @@ export interface Entity {
   color: string;
 }
 
-export type EventIcon = "none" | "gym" | "ozon" | "briefcase" | "star" | "car" | "food";
+export type EventIcon = "none" | "briefcase" | "star" | "car" | "food";
 
 export const EVENT_ICON_LABELS: Record<EventIcon, string> = {
   none:      "—",
-  gym:       "Качалка",
-  ozon:      "Озон ПВЗ",
   briefcase: "Работа",
   star:      "Важное",
   car:       "Поездка",
@@ -23,15 +21,16 @@ export interface PlannerEvent {
   entityId: string;
   date: string;       // YYYY-MM-DD
   status: EventStatus;
-  title: string;
-  assignee: string;
+  title?: string;
   notes?: string;
-  startTime?: string; // "HH:MM"
-  endTime?: string;   // "HH:MM"
+  earnings?: number;
+  expenses?: number;
+  done?: boolean;
+  // legacy compat fields (not shown in UI):
+  assignee?: string;
+  startTime?: string;
+  endTime?: string;
   icon?: EventIcon;
-  earnings?: number;  // руб. за смену
-  expenses?: number;  // руб. трат
-  done?: boolean;     // выполнено
 }
 
 export interface Goal {
@@ -40,22 +39,31 @@ export interface Goal {
   amount: number;
 }
 
-export const STATUS_COLORS: Record<EventStatus, string> = {
-  confirmed: "#3dd68c",
-  pending:   "#f59e0b",
+export const STATUS_COLORS: Record<string, string> = {
+  planned:   "#5b9cf6",
+  confirmed: "#3ecf8e",
+  past:      "#546070",
+  // backward compat
+  pending:   "#5b9cf6",
+  overdue:   "#546070",
 };
 
-export const STATUS_GRADIENTS: Record<EventStatus, string> = {
+export const STATUS_GRADIENTS: Record<string, string> = {
+  planned:   "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
   confirmed: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-  pending:   "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+  past:      "linear-gradient(135deg, #546070 0%, #3d4f5f 100%)",
 };
 
-export const STATUS_LABELS: Record<EventStatus, string> = {
+export const STATUS_LABELS: Record<string, string> = {
+  planned:   "Запланировано",
   confirmed: "Подтверждено",
-  pending:   "Ожидание",
+  past:      "Прошедшее",
+  // backward compat
+  pending:   "Запланировано",
+  overdue:   "Прошедшее",
 };
 
-export const STATUS_CYCLE: EventStatus[] = ["pending", "confirmed"];
+export const STATUS_CYCLE: EventStatus[] = ["planned", "confirmed", "past"];
 
 export const ENTITY_PALETTE = [
   "#6366f1","#3b82f6","#0ea5e9","#06b6d4","#14b8a6",
@@ -63,7 +71,6 @@ export const ENTITY_PALETTE = [
   "#ec4899","#a855f7","#8b5cf6",
 ];
 
-/** Returns "2 ч 30 мин", "45 мин", "3 ч" or "" */
 export function calcDuration(startTime: string, endTime: string): string {
   try {
     const [sh, sm] = startTime.split(":").map(Number);
@@ -80,7 +87,6 @@ export function calcDuration(startTime: string, endTime: string): string {
   }
 }
 
-/** Returns duration in minutes */
 export function calcDurationMins(startTime: string, endTime: string): number {
   try {
     const [sh, sm] = startTime.split(":").map(Number);
@@ -89,12 +95,10 @@ export function calcDurationMins(startTime: string, endTime: string): number {
   } catch { return 0; }
 }
 
-/** "09:00" → "9:00" for compact display */
 export function fmtTime(t: string): string {
   return t?.startsWith("0") ? t.slice(1) : t;
 }
 
-/** Add minutes to a "HH:MM" string */
 export function addMinutes(time: string, mins: number): string {
   try {
     const [h, m] = time.split(":").map(Number);
@@ -103,12 +107,10 @@ export function addMinutes(time: string, mins: number): string {
   } catch { return time; }
 }
 
-/** "HH:MM" → minutes since midnight */
 export function timeToMins(t: string): number {
   try { const [h, m] = t.split(":").map(Number); return h * 60 + m; } catch { return 0; }
 }
 
-/** Returns true if time intervals [s1,e1) and [s2,e2) overlap */
 export function hasTimeOverlap(s1: string, e1: string, s2: string, e2: string): boolean {
   return timeToMins(s1) < timeToMins(e2) && timeToMins(e1) > timeToMins(s2);
 }

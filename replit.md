@@ -1,44 +1,55 @@
-# [Project name]
+# Мои Смены — Personal Shift Planner
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A single-user personal shift planner for managing work locations (объекты) and shift dates.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/planner run dev` — run the planner UI (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- UI: React 19 + Vite 7 + Tailwind CSS 4
+- Data: localStorage (no backend DB needed for single-user app)
+- Icons: lucide-react
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/planner/src/pages/Home.tsx` — entire app UI (single-file monolith with all components inline)
+- `artifacts/planner/src/types.ts` — EventStatus, PlannerEvent, STATUS_COLORS/LABELS/CYCLE
+- `artifacts/planner/src/hooks/use-planner.ts` — all data access via localStorage
+- `artifacts/planner/src/index.css` — CSS variables and minimal custom classes
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Single-user, localStorage only** — no assignees, no multi-user, no backend auth required
+- **3 statuses only**: `planned` / `confirmed` / `past` (+ backward-compat aliases `pending`/`overdue`)
+- **Fixed shift time 9:00–21:00 (12h)**: shown as static info, not editable
+- **Work locations** (объекты): user creates named locations, grid rows = locations
+- **Design**: calm blue (#5b9cf6) primary, dark navy background, NO glassmorphism/glow/gradient text
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Monthly calendar grid: rows = work locations, columns = days of the month
+- Sidebar: brand, month navigation, shift stats (planned/confirmed/past), upcoming shifts
+- Topbar: stat summary + Finance / Timeline toggles
+- Add/view shift popup: fixed time display, status picker, earnings, notes
+- Demo data: 4 example locations (Ресторан на Невском, Кафе Садовая, etc.)
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- **NO**: staff/assignee features, time picker, glassmorphism, gradient text, SVG rings, glow effects
+- **YES**: clean, balanced, readable design; cohesive and simple
+- Statuses in Russian: Запланировано / Подтверждено / Прошедшее
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- `STATUS_COLORS` uses `Record<string, string>` (not `Record<EventStatus, string>`) to support old localStorage keys with "pending"/"overdue"
+- localStorage keys are versioned (`planner_entities_v4`, `planner_events_v4_YYYY-MM`) — bump version on breaking schema change
+- Home.tsx is ~2200 lines single-file; search by component name (e.g. `function AddEventPopup`) to navigate
 
 ## Pointers
 

@@ -1,0 +1,1 @@
+- [Shift planner design decisions](shift-planner-design.md) — single-user, 3 statuses, fixed 9-21h shift, no assignees, no glassmorphism
