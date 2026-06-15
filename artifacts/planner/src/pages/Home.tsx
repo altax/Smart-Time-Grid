@@ -701,11 +701,11 @@ export default function Home() {
           ) : (
             <table style={{
               tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "2px",
-              background: BASE, minWidth: "100%",
+              background: BASE, width: "100%",
             }}>
               <colgroup>
-                <col style={{ width: 220, minWidth: 220 }}/>
-                {days.map(d => <col key={d.toISOString()} style={{ minWidth: 34 }}/>)}
+                <col style={{ width: 220, minWidth: 180 }}/>
+                {days.map(d => <col key={d.toISOString()}/>)}
               </colgroup>
 
               <thead style={{ position: "sticky", top: 0, zIndex: 20, background: BASE }}>
