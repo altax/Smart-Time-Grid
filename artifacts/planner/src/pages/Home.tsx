@@ -333,240 +333,327 @@ export default function Home() {
   }
 
   /* ── Design tokens ── */
-  const BG          = "#070b14";
-  const SIDEBAR_BG  = "#0b0f1c";
-  const BORDER      = "#161d2e";
-  const FG          = "rgba(226,232,240,0.88)";
-  const FG_DIM      = "rgba(226,232,240,0.35)";
-  const CELL_WD     = "#111929";
-  const CELL_WE     = "#0d1520";
-  const CELL_CONF   = "#0f3d22";
-  const CELL_PEND   = "#3d2500";
-  const CELL_DRAG   = "rgba(99,102,241,0.22)";
-  const INDIGO      = "#6366f1";
-  const TODAY_COL   = "rgba(99,102,241,0.07)";
+  const BASE        = "#030712";
+  const PANEL       = "#080d1d";
+  const VIOLET      = "#8b5cf6";
+  const GREEN       = "#10b981";
+  const AMBER       = "#f59e0b";
+  const RED_C       = "#ef4444";
+  const FG          = "rgba(226,232,240,0.9)";
+  const FG_MED      = "rgba(226,232,240,0.55)";
+  const FG_DIM      = "rgba(226,232,240,0.25)";
+  const BORDER      = "rgba(255,255,255,0.058)";
+  const BORDER_MED  = "rgba(255,255,255,0.1)";
   const DAY_SHORT   = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
 
+  /* ── Staff avatar color ── */
+  function avatarColor(name: string): string {
+    const palette = ["#8b5cf6","#06b6d4","#f59e0b","#10b981","#ef4444","#3b82f6","#ec4899","#f97316"];
+    let h = 0;
+    for (const c of name) h = (h << 5) - h + c.charCodeAt(0);
+    return palette[Math.abs(h) % palette.length];
+  }
+
+  function fmtK(n: number): string {
+    if (n >= 1000000) return `${(n/1000000).toLocaleString("ru-RU",{maximumFractionDigits:1})} М`;
+    if (n >= 1000)    return `${(n/1000).toLocaleString("ru-RU",{maximumFractionDigits:1})} к`;
+    return `${n}`;
+  }
+
+  const pct = events.length > 0 ? confirmedN / events.length : 0;
+  const ringLen = 100;
+  const ringFill = Math.round(pct * ringLen);
+
   return (
-    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, color: FG, fontFamily: "Inter, sans-serif" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BASE, color: FG, fontFamily: "'Inter', -apple-system, sans-serif" }}>
 
       {/* ═══════════════ SIDEBAR ═══════════════ */}
       <aside style={{
-        width: 248, flexShrink: 0,
-        background: SIDEBAR_BG,
+        width: 264, flexShrink: 0,
+        background: PANEL,
         borderRight: `1px solid ${BORDER}`,
         display: "flex", flexDirection: "column",
         overflow: "hidden",
+        position: "relative",
       }}>
-        {/* ── Brand + Month nav ── */}
-        <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
-          {/* App icon + title */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 10,
-              background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, boxShadow: "0 0 16px rgba(99,102,241,0.3)",
-            }}>
-              <CalendarDays style={{ width: 15, height: 15, color: "#fff" }}/>
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(226,232,240,0.95)", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-                Планировщик
+        {/* ── Brand bar ── */}
+        <div style={{ padding: "16px 16px 12px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: 11,
+                background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+                boxShadow: "0 0 0 1px rgba(124,58,237,0.3), 0 8px 24px rgba(124,58,237,0.25)",
+              }}>
+                <CalendarDays style={{ width: 16, height: 16, color: "#fff" }}/>
               </div>
-              <div style={{ fontSize: 10, color: FG_DIM, marginTop: 2, letterSpacing: "0.01em" }}>
-                смен и финансов
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(226,232,240,0.96)", letterSpacing: "-0.025em", lineHeight: 1 }}>
+                  ShiftPlanner
+                </div>
+                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 3, letterSpacing: "0.01em" }}>
+                  {currentMonth.getFullYear()}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Month nav pill */}
+          {/* Month navigation */}
           <div style={{
-            display: "flex", alignItems: "center", gap: 4,
-            background: "#0f1628", borderRadius: 10, border: `1px solid ${BORDER}`, padding: "4px 6px",
+            display: "flex", alignItems: "center",
+            background: "rgba(255,255,255,0.03)",
+            border: `1px solid ${BORDER}`,
+            borderRadius: 10, padding: "3px",
           }}>
             <button data-testid="btn-prev-month" onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0, transition: "background 0.15s" }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}>
-              <ChevronLeft style={{ width: 13, height: 13 }}/>
+              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0 }}>
+              <ChevronLeft style={{ width: 12, height: 12 }}/>
             </button>
             <button data-testid="btn-today" onClick={() => setCurrentMonth(new Date())}
-              style={{ flex: 1, fontSize: 13, fontWeight: 600, color: FG, background: "transparent", border: "none", cursor: "pointer", textAlign: "center", letterSpacing: "-0.01em" }}>
-              {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+              style={{ flex: 1, fontSize: 12, fontWeight: 600, color: FG, background: "transparent", border: "none", cursor: "pointer", textAlign: "center", letterSpacing: "-0.01em" }}>
+              {MONTH_NAMES[currentMonth.getMonth()]}
             </button>
             <button data-testid="btn-next-month" onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0, transition: "background 0.15s" }}
-              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"}
-              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}>
-              <ChevronRight style={{ width: 13, height: 13 }}/>
+              style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0 }}>
+              <ChevronRight style={{ width: 12, height: 12 }}/>
             </button>
           </div>
         </div>
 
         {/* ── Scrollable body ── */}
-        <div className="sidebar-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
+        <div className="sb-thin" style={{ flex: 1, overflowY: "auto", padding: "16px 14px 0" }}>
 
-          {/* KPI bento */}
-          <div style={{ marginBottom: 14 }}>
-            {/* Earnings hero card */}
+          {/* ── Payroll ring + earnings ── */}
+          <div style={{
+            background: "linear-gradient(145deg, rgba(16,185,129,0.07) 0%, rgba(5,150,105,0.02) 100%)",
+            border: "1px solid rgba(16,185,129,0.12)",
+            borderRadius: 16, padding: "16px",
+            marginBottom: 10,
+            position: "relative", overflow: "hidden",
+          }}>
+            {/* Glow orb */}
             <div style={{
-              background: "linear-gradient(135deg, rgba(22,163,74,0.10) 0%, rgba(16,185,129,0.04) 100%)",
-              border: "1px solid rgba(22,163,74,0.18)",
-              borderRadius: 14, padding: "14px 16px", marginBottom: 8,
-            }}>
-              <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.3)", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 8 }}>
-                Фонд оплаты труда
-              </div>
-              <div style={{ fontSize: 28, fontWeight: 800, color: "#4ade80", lineHeight: 1, letterSpacing: "-0.05em" }}>
-                {totalEarnings >= 1000
-                  ? `${(totalEarnings / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} к`
-                  : `${totalEarnings}`}
-                <span style={{ fontSize: 16, marginLeft: 3, fontWeight: 600 }}>₽</span>
-              </div>
-              {events.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%",
-                      width: `${Math.round((confirmedN / events.length) * 100)}%`,
-                      background: "linear-gradient(90deg, #16a34a, #4ade80)",
-                      borderRadius: 99, transition: "width 0.5s ease",
-                    }}/>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
-                    <span style={{ fontSize: 9, color: "rgba(226,232,240,0.25)" }}>{events.length} смен всего</span>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: "#4ade80" }}>{Math.round((confirmedN / events.length) * 100)}% ✓</span>
-                  </div>
-                </div>
-              )}
-            </div>
+              position: "absolute", right: -20, top: -20,
+              width: 100, height: 100, borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)",
+              pointerEvents: "none",
+            }}/>
 
-            {/* 2-col stat cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <div style={{ background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.13)", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#4ade80", letterSpacing: "-0.05em", lineHeight: 1 }}>{confirmedN}</div>
-                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 5 }}>подтверждено</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              {/* SVG progress ring */}
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <svg width={64} height={64} viewBox="0 0 36 36" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3"/>
+                  <circle cx="18" cy="18" r="14" fill="none"
+                    stroke="url(#rg)" strokeWidth="3"
+                    strokeDasharray={`${ringFill * 0.879} 87.9`}
+                    strokeLinecap="round"
+                    style={{ transition: "stroke-dasharray 0.8s cubic-bezier(.4,0,.2,1)" }}/>
+                  <defs>
+                    <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#059669"/>
+                      <stop offset="100%" stopColor="#34d399"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div style={{
+                  position: "absolute", inset: 0, display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                  fontSize: 11, fontWeight: 800, color: "#34d399", letterSpacing: "-0.03em",
+                }}>
+                  {Math.round(pct * 100)}%
+                </div>
               </div>
-              <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.13)", borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", letterSpacing: "-0.05em", lineHeight: 1 }}>{pendingN}</div>
-                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 5 }}>ожидание</div>
+
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+                  Фонд оплаты
+                </div>
+                <div style={{ letterSpacing: "-0.04em", lineHeight: 1 }}>
+                  <span className="grad-green" style={{ fontSize: 30, fontWeight: 900 }}>
+                    {fmtK(totalEarnings)}
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "#34d399", marginLeft: 2 }}>₽</span>
+                </div>
+                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 5 }}>
+                  {events.length} смен · {thisWeekEarnings > 0 && <span style={{ color: "#34d399" }}>+{fmtK(thisWeekEarnings)}₽ на неделе</span>}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Divider */}
-          <div style={{ height: 1, background: BORDER, margin: "2px 0 14px" }}/>
+          {/* ── 3-col mini stats ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 14 }}>
+            {[
+              { n: confirmedN,  label: "ОК",    color: GREEN,  bg: "rgba(16,185,129,0.07)",  border: "rgba(16,185,129,0.15)" },
+              { n: pendingN,    label: "WAIT",  color: AMBER,  bg: "rgba(245,158,11,0.07)",  border: "rgba(245,158,11,0.15)" },
+              { n: overdueN,    label: "OVER",  color: RED_C,  bg: "rgba(239,68,68,0.07)",   border: "rgba(239,68,68,0.15)" },
+            ].map(({ n, label, color, bg, border }) => (
+              <div key={label} style={{
+                background: bg, border: `1px solid ${border}`,
+                borderRadius: 12, padding: "10px 10px 9px",
+                display: "flex", flexDirection: "column", alignItems: "center",
+              }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: "-0.05em", lineHeight: 1 }}>{n}</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "rgba(226,232,240,0.25)", marginTop: 4, letterSpacing: "0.08em" }}>{label}</div>
+              </div>
+            ))}
+          </div>
 
-          {/* Upcoming shifts */}
+          {/* divider */}
+          <div style={{ height: "1px", background: BORDER, margin: "2px 0 14px" }}/>
+
+          {/* ── Upcoming shifts ── */}
           {(() => {
             const todayStr = format(new Date(), "yyyy-MM-dd");
             const upcoming = events
-              .filter(e => e.date >= todayStr && e.status === "pending")
+              .filter(e => e.date >= todayStr)
               .sort((a, b) => a.date.localeCompare(b.date))
-              .slice(0, 3);
-            const entityName = (id: string) => entities.find(e => e.id === id)?.name ?? "—";
+              .slice(0, 4);
             return (
               <div style={{ marginBottom: 14 }}>
-                <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Ближайшие смены</p>
-                {upcoming.length === 0 ? (
-                  <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет запланированных</p>
-                ) : upcoming.map(ev => {
-                  const d = parseISO(ev.date);
-                  return (
-                    <div key={ev.id} style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 8 }}>
-                      <div style={{
-                        flexShrink: 0, textAlign: "center",
-                        background: "#111929", border: `1px solid ${BORDER}`,
-                        borderRadius: 8, padding: "4px 6px", minWidth: 32,
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: FG_DIM, letterSpacing: "0.09em", textTransform: "uppercase" }}>
+                    Ближайшие
+                  </span>
+                </div>
+                {upcoming.length === 0
+                  ? <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет смен</p>
+                  : upcoming.map(ev => {
+                    const d = parseISO(ev.date);
+                    const isConf = ev.status === "confirmed";
+                    const dotColor = isConf ? GREEN : AMBER;
+                    const eName = entities.find(e => e.id === ev.entityId)?.name ?? "—";
+                    return (
+                      <div key={ev.id} style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "7px 10px", borderRadius: 10,
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${BORDER}`,
+                        marginBottom: 5,
+                        transition: "background 0.15s",
                       }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: FG, lineHeight: 1 }}>{format(d, "d")}</div>
-                        <div style={{ fontSize: 8, color: FG_DIM, lineHeight: 1, marginTop: 2, textTransform: "uppercase" }}>
-                          {["вс","пн","вт","ср","чт","пт","сб"][d.getDay()]}
+                        <div style={{
+                          flexShrink: 0, width: 34, textAlign: "center",
+                          borderRight: `1px solid ${BORDER}`, paddingRight: 10,
+                        }}>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: FG, letterSpacing: "-0.04em", lineHeight: 1 }}>{format(d, "d")}</div>
+                          <div style={{ fontSize: 8, color: FG_DIM, marginTop: 2, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            {DAY_SHORT[d.getDay()]}
+                          </div>
                         </div>
-                      </div>
-                      <div style={{ minWidth: 0, paddingTop: 2 }}>
-                        <div style={{ fontSize: 11, fontWeight: 500, color: "rgba(226,232,240,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {entityName(ev.entityId)}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 11, fontWeight: 500, color: "rgba(226,232,240,0.78)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {eName}
+                          </div>
+                          {ev.assignee && ev.assignee !== "—" && (
+                            <div style={{ fontSize: 10, color: FG_DIM, marginTop: 1 }}>{ev.assignee}</div>
+                          )}
                         </div>
-                        {ev.assignee && ev.assignee !== "—" && (
-                          <div style={{ fontSize: 10, color: FG_DIM, marginTop: 2 }}>{ev.assignee}</div>
-                        )}
+                        <div style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0 }}/>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                }
               </div>
             );
           })()}
 
-          {/* Divider */}
-          <div style={{ height: 1, background: BORDER, margin: "2px 0 14px" }}/>
+          {/* divider */}
+          <div style={{ height: "1px", background: BORDER, margin: "2px 0 14px" }}/>
 
-          {/* Staff */}
+          {/* ── Staff leaderboard ── */}
           {(() => {
             const map: Record<string, number> = {};
             events.forEach(e => {
               if (e.assignee && e.assignee !== "—") map[e.assignee] = (map[e.assignee] ?? 0) + 1;
             });
-            const staff = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const staff = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
             const max = staff[0]?.[1] ?? 1;
             return (
-              <div style={{ marginBottom: 14 }}>
-                <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Сотрудники</p>
-                {staff.length === 0 ? (
-                  <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет данных</p>
-                ) : staff.map(([name, cnt]) => (
-                  <div key={name} style={{ marginBottom: 8 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, color: "rgba(226,232,240,0.65)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>{name}</span>
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, color: "#4ade80",
-                        background: "rgba(74,222,128,0.1)", borderRadius: 99,
-                        padding: "1px 6px", flexShrink: 0, marginLeft: 6,
-                      }}>{cnt}</span>
-                    </div>
-                    <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.05)" }}>
-                      <div style={{ height: "100%", width: `${(cnt / max) * 100}%`, background: "linear-gradient(90deg, #16a34a, #4ade80)", borderRadius: 99, transition: "width 0.3s" }}/>
-                    </div>
-                  </div>
-                ))}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: FG_DIM, letterSpacing: "0.09em", textTransform: "uppercase" }}>
+                    Топ сотрудников
+                  </span>
+                  {staff.length > 0 && (
+                    <span style={{
+                      fontSize: 9, color: FG_DIM,
+                      background: "rgba(255,255,255,0.04)",
+                      border: `1px solid ${BORDER}`, borderRadius: 99, padding: "1px 7px",
+                    }}>{staff.length}</span>
+                  )}
+                </div>
+                {staff.length === 0
+                  ? <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет данных</p>
+                  : staff.map(([name, cnt], i) => {
+                    const ac = avatarColor(name);
+                    const initials = name.split(" ").map(p => p[0]).join("").slice(0,2).toUpperCase();
+                    return (
+                      <div key={name} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 8 }}>
+                        {/* Rank */}
+                        <div style={{ width: 14, textAlign: "right", fontSize: 9, color: FG_DIM, flexShrink: 0, fontWeight: 600 }}>
+                          {i + 1}
+                        </div>
+                        {/* Avatar */}
+                        <div style={{
+                          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                          background: `${ac}22`,
+                          border: `1px solid ${ac}44`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 9, fontWeight: 700, color: ac, letterSpacing: "0.02em",
+                        }}>
+                          {initials}
+                        </div>
+                        {/* Name + bar */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                            <span style={{ fontSize: 11, color: "rgba(226,232,240,0.72)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{name}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: ac, flexShrink: 0, marginLeft: 4 }}>{cnt}</span>
+                          </div>
+                          <div style={{ height: 2, borderRadius: 99, background: "rgba(255,255,255,0.05)" }}>
+                            <div style={{
+                              height: "100%",
+                              width: `${(cnt / max) * 100}%`,
+                              background: `linear-gradient(90deg, ${ac}aa, ${ac})`,
+                              borderRadius: 99, transition: "width 0.4s ease",
+                            }}/>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
               </div>
             );
           })()}
-
-          {/* Divider */}
-          <div style={{ height: 1, background: BORDER, margin: "2px 0 14px" }}/>
-
-          {/* Legend */}
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Статус</p>
-            <div style={{ display: "flex", gap: 6 }}>
-              {[
-                { label: "Подтверждено", color: "#4ade80", bg: "rgba(74,222,128,0.08)", border: "rgba(74,222,128,0.2)" },
-                { label: "Ожидание",     color: "#fbbf24", bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.2)" },
-              ].map(({ label, color, bg, border }) => (
-                <div key={label} style={{ flex: 1, background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "7px 10px" }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 3, background: color, marginBottom: 5 }}/>
-                  <div style={{ fontSize: 10, color: "rgba(226,232,240,0.55)", lineHeight: 1.3 }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* ── Add entity button ── */}
-        <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        {/* ── Footer: Add entity ── */}
+        <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <button
             onClick={() => setShowAddRow(true)}
             style={{
-              width: "100%", padding: "9px 14px", borderRadius: 10,
-              background: "transparent", border: `1px dashed ${BORDER}`,
+              width: "100%", padding: "9px 0", borderRadius: 10,
+              background: "transparent",
+              border: `1px dashed rgba(255,255,255,0.1)`,
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              gap: 8, color: FG_DIM, fontSize: 12, fontWeight: 500, transition: "all 0.15s",
+              gap: 7, color: FG_DIM, fontSize: 12, fontWeight: 500, transition: "all 0.18s",
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = INDIGO; (e.currentTarget as HTMLButtonElement).style.color = INDIGO; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER; (e.currentTarget as HTMLButtonElement).style.color = FG_DIM; }}>
+            onMouseEnter={e => {
+              const b = e.currentTarget as HTMLButtonElement;
+              b.style.borderColor = `${VIOLET}66`;
+              b.style.color = VIOLET;
+              b.style.background = `${VIOLET}0d`;
+            }}
+            onMouseLeave={e => {
+              const b = e.currentTarget as HTMLButtonElement;
+              b.style.borderColor = "rgba(255,255,255,0.1)";
+              b.style.color = FG_DIM;
+              b.style.background = "transparent";
+            }}>
             <Plus style={{ width: 13, height: 13 }}/>
             Добавить объект
           </button>
@@ -576,153 +663,155 @@ export default function Home() {
       {/* ═══════════════ MAIN ═══════════════ */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ── Top bar ── */}
-        <div style={{
-          height: 50, flexShrink: 0,
-          borderBottom: `1px solid ${BORDER}`,
+        {/* ── Topbar ── */}
+        <div className="topbar-glass" style={{
+          height: 48, flexShrink: 0,
           display: "flex", alignItems: "center",
-          padding: "0 20px", gap: 16,
-          background: SIDEBAR_BG,
+          padding: "0 18px", gap: 0,
+          position: "relative", zIndex: 10,
         }}>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: 11, color: FG_DIM }}>
-              <span style={{ color: FG, fontWeight: 600 }}>{entities.length}</span> объект{entities.length === 1 ? "" : entities.length < 5 ? "а" : "ов"}
-            </span>
-            <span style={{ width: 1, height: 14, background: BORDER }}/>
-            <span style={{ fontSize: 11, color: FG_DIM }}>
-              <span style={{ color: "#4ade80", fontWeight: 600 }}>{confirmedN}</span> подтверждено
-            </span>
-            <span style={{ width: 1, height: 14, background: BORDER }}/>
-            <span style={{ fontSize: 11, color: FG_DIM }}>
-              <span style={{ color: "#fbbf24", fontWeight: 600 }}>{pendingN}</span> ожидание
-            </span>
+          {/* Stat chips */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
+            <div className="stat-chip" style={{ color: FG_MED, borderColor: BORDER, background: "rgba(255,255,255,0.025)" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: FG, letterSpacing: "-0.02em" }}>{entities.length}</span>
+              <span>объект{entities.length === 1 ? "" : entities.length < 5 ? "а" : "ов"}</span>
+            </div>
+            <div className="stat-chip" style={{ color: GREEN, borderColor: "rgba(16,185,129,0.2)", background: "rgba(16,185,129,0.06)" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: GREEN, flexShrink: 0 }}/>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>{confirmedN}</span>
+              <span style={{ color: "rgba(16,185,129,0.65)" }}>подтверждено</span>
+            </div>
+            <div className="stat-chip" style={{ color: AMBER, borderColor: "rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.05)" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: AMBER, flexShrink: 0 }}/>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>{pendingN}</span>
+              <span style={{ color: "rgba(245,158,11,0.65)" }}>ожидание</span>
+            </div>
             {overdueN > 0 && (
-              <>
-                <span style={{ width: 1, height: 14, background: BORDER }}/>
-                <span style={{ fontSize: 11, color: FG_DIM }}>
-                  <span style={{ color: "#f87171", fontWeight: 600 }}>{overdueN}</span> просрочено
-                </span>
-              </>
+              <div className="stat-chip" style={{ color: RED_C, borderColor: "rgba(239,68,68,0.22)", background: "rgba(239,68,68,0.07)" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED_C, flexShrink: 0 }}/>
+                <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: "-0.02em" }}>{overdueN}</span>
+                <span style={{ color: "rgba(239,68,68,0.65)" }}>просрочено</span>
+              </div>
             )}
           </div>
 
-          {/* Finance button */}
-          <button onClick={() => setShowFinance(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 8,
-              border: `1px solid ${showFinance ? "rgba(167,139,250,0.4)" : BORDER}`,
-              background: showFinance ? "rgba(167,139,250,0.08)" : "transparent",
-              color: showFinance ? "#a78bfa" : FG_DIM,
-              cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all 0.2s",
-            }}>
-            <Wallet style={{ width: 13, height: 13 }}/>
-            Финансы
-          </button>
-
-          {/* Timeline toggle */}
-          <button onClick={() => setTlCollapsed(v => !v)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 14px", borderRadius: 8,
-              border: `1px solid ${!tlCollapsed ? "rgba(99,102,241,0.4)" : BORDER}`,
-              background: !tlCollapsed ? "rgba(99,102,241,0.08)" : "transparent",
-              color: !tlCollapsed ? INDIGO : FG_DIM,
-              cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all 0.2s",
-            }}>
-            <Clock style={{ width: 13, height: 13 }}/>
-            Таймлайн
-          </button>
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setShowFinance(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 500,
+                border: showFinance ? "1px solid rgba(167,139,250,0.35)" : `1px solid ${BORDER}`,
+                background: showFinance ? "rgba(139,92,246,0.1)" : "rgba(255,255,255,0.025)",
+                color: showFinance ? "#a78bfa" : FG_MED, cursor: "pointer", transition: "all 0.18s",
+              }}>
+              <Wallet style={{ width: 12, height: 12 }}/>
+              Финансы
+            </button>
+            <button onClick={() => setTlCollapsed(v => !v)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 500,
+                border: !tlCollapsed ? `1px solid ${VIOLET}55` : `1px solid ${BORDER}`,
+                background: !tlCollapsed ? `${VIOLET}14` : "rgba(255,255,255,0.025)",
+                color: !tlCollapsed ? VIOLET : FG_MED, cursor: "pointer", transition: "all 0.18s",
+              }}>
+              <Clock style={{ width: 12, height: 12 }}/>
+              Таймлайн
+            </button>
+          </div>
         </div>
 
-        {/* ── Grid + Finance panel ── */}
+        {/* ── Grid + optional Finance panel ── */}
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-          {/* ── Grid area ── */}
+          {/* ── Grid column ── */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
             {/* Scrollable grid */}
-            <div ref={gridRef} style={{ flex: 1, overflow: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
-              <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", background: BG, minWidth: "100%" }}>
+            <div ref={gridRef} className="sb-thin" style={{ flex: 1, overflow: "auto" }}>
+              <table style={{
+                tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "2px",
+                background: BASE, minWidth: "100%",
+              }}>
                 <colgroup>
-                  <col style={{ width: 204, minWidth: 204 }}/>
-                  {days.map(d => <col key={d.toISOString()} style={{ width: 30, minWidth: 30 }}/>)}
+                  <col style={{ width: 210, minWidth: 210 }}/>
+                  {days.map(d => <col key={d.toISOString()} style={{ minWidth: 28 }}/>)}
                 </colgroup>
 
-                <thead style={{ position: "sticky", top: 0, zIndex: 20, background: BG }}>
-                  {/* ── Week totals row ── */}
+                <thead style={{ position: "sticky", top: 0, zIndex: 20, background: BASE }}>
+                  {/* Week earning badges row */}
                   <tr>
-                    <th style={{ background: BG, position: "sticky", left: 0, zIndex: 30, padding: "6px 8px 2px" }}>
-                      <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                    <th style={{ background: BASE, position: "sticky", left: 0, zIndex: 30, padding: "8px 10px 2px 12px" }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                         Объект
                       </span>
                     </th>
                     {weekGroups.map((wDays, wi) => {
-                      const earn  = weekEarnings(wDays);
-                      const isFirstWeekStart = wi === 0 && wDays[0].getDay() !== 1;
+                      const earn = weekEarnings(wDays);
                       return (
                         <th key={wi} colSpan={wDays.length}
                           style={{
-                            background: BG,
-                            padding: "6px 0 2px",
+                            background: BASE,
+                            padding: "8px 0 2px",
                             textAlign: "center",
                             verticalAlign: "middle",
-                            borderLeft: wi > 0 || !isFirstWeekStart ? `3px solid ${BG}` : undefined,
+                            borderLeft: wi > 0 ? `4px solid ${BASE}` : undefined,
                           }}>
-                          {earn > 0 && (
+                          {earn > 0 ? (
                             <span style={{
-                              display: "inline-flex", alignItems: "center", gap: 3,
-                              fontSize: 9, fontWeight: 600,
-                              color: "#4ade80",
-                              background: "rgba(74,222,128,0.08)",
-                              border: "1px solid rgba(74,222,128,0.14)",
-                              borderRadius: 99, padding: "1px 7px",
+                              display: "inline-flex", alignItems: "center",
+                              fontSize: 9, fontWeight: 700,
+                              color: GREEN,
+                              background: "rgba(16,185,129,0.07)",
+                              border: "1px solid rgba(16,185,129,0.15)",
+                              borderRadius: 99, padding: "2px 8px",
+                              letterSpacing: "-0.01em",
                             }}>
-                              {earn >= 1000
-                                ? `${(earn / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}к`
-                                : earn} ₽
+                              {fmtK(earn)} ₽
                             </span>
+                          ) : (
+                            <span style={{ fontSize: 9, color: FG_DIM, opacity: 0.4 }}>—</span>
                           )}
                         </th>
                       );
                     })}
                   </tr>
 
-                  {/* ── Day headers row ── */}
+                  {/* Day labels row */}
                   <tr>
-                    <th style={{ background: BG, position: "sticky", left: 0, zIndex: 30, padding: "0 8px 6px" }}/>
+                    <th style={{ background: BASE, position: "sticky", left: 0, zIndex: 30, padding: "2px 10px 8px 12px" }}/>
                     {days.map(day => {
                       const tod = isToday(day), wknd = isWeekend(day);
-                      const isWeekStart = day.getDay() === 1;
                       return (
                         <th key={day.toISOString()}
                           ref={tod ? todayThRef : undefined}
                           style={{
-                            background: tod ? TODAY_COL : "transparent",
-                            padding: "0 0 6px",
-                            verticalAlign: "bottom",
+                            background: tod ? "rgba(139,92,246,0.06)" : "transparent",
+                            padding: "2px 0 8px",
                             textAlign: "center",
-                            borderLeft: isWeekStart ? `3px solid ${BG}` : undefined,
+                            verticalAlign: "bottom",
+                            borderLeft: day.getDay() === 1 ? `4px solid ${BASE}` : undefined,
                           }}>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                             <span style={{
                               fontSize: 8, fontWeight: 500,
-                              color: wknd ? "rgba(226,232,240,0.18)" : "rgba(226,232,240,0.3)",
-                              letterSpacing: "0.03em", textTransform: "uppercase",
-                              lineHeight: 1,
+                              color: wknd ? "rgba(226,232,240,0.14)" : "rgba(226,232,240,0.28)",
+                              letterSpacing: "0.04em", textTransform: "uppercase", lineHeight: 1,
                             }}>
                               {DAY_SHORT[day.getDay()]}
                             </span>
-                            <span style={{
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              width: 22, height: 22, borderRadius: 7,
-                              fontSize: 10,
-                              fontWeight: tod ? 800 : 500,
-                              background: tod ? INDIGO : "transparent",
-                              color: tod ? "#fff" : wknd ? "rgba(226,232,240,0.2)" : "rgba(226,232,240,0.55)",
-                              boxShadow: tod ? `0 0 10px rgba(99,102,241,0.5)` : "none",
-                              transition: "all 0.2s",
-                            }}>
+                            <span className={tod ? "today-pill" : ""}
+                              style={{
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                width: tod ? 22 : 18, height: tod ? 22 : 18,
+                                borderRadius: tod ? 8 : 5,
+                                fontSize: tod ? 10 : 9,
+                                fontWeight: tod ? 900 : 500,
+                                background: tod ? VIOLET : "transparent",
+                                color: tod ? "#fff" : wknd ? "rgba(226,232,240,0.18)" : "rgba(226,232,240,0.5)",
+                                transition: "all 0.2s",
+                              }}>
                               {format(day, "d")}
                             </span>
                           </div>
@@ -736,14 +825,23 @@ export default function Home() {
                   {entities.length === 0 && (
                     <tr>
                       <td colSpan={days.length + 1}
-                        style={{ background: "transparent", padding: "72px 0", textAlign: "center" }}>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-                          <div style={{ width: 48, height: 48, borderRadius: 14, background: "#111929", border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <CalendarDays style={{ width: 22, height: 22, color: FG_DIM }}/>
+                        style={{ background: "transparent", padding: "80px 0", textAlign: "center" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                          <div style={{
+                            width: 56, height: 56, borderRadius: 18,
+                            background: "rgba(139,92,246,0.07)",
+                            border: `1px solid rgba(139,92,246,0.18)`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <CalendarDays style={{ width: 24, height: 24, color: VIOLET }}/>
                           </div>
-                          <p style={{ fontSize: 13, color: "rgba(226,232,240,0.4)", fontWeight: 500 }}>Нет объектов</p>
+                          <p style={{ fontSize: 14, color: "rgba(226,232,240,0.35)", fontWeight: 600 }}>Нет объектов</p>
                           <button data-testid="btn-demo" onClick={loadDemoData}
-                            style={{ fontSize: 11, padding: "6px 16px", borderRadius: 8, background: "rgba(99,102,241,0.12)", color: INDIGO, border: `1px solid rgba(99,102,241,0.25)`, cursor: "pointer", fontWeight: 500 }}>
+                            style={{
+                              fontSize: 12, padding: "8px 20px", borderRadius: 10, fontWeight: 600,
+                              background: `${VIOLET}18`, color: VIOLET,
+                              border: `1px solid ${VIOLET}44`, cursor: "pointer",
+                            }}>
                             Загрузить демо-данные
                           </button>
                         </div>
@@ -778,17 +876,17 @@ export default function Home() {
                     />
                   ))}
 
-                  {/* ── Add entity inline row ── */}
+                  {/* Add entity row */}
                   {showAddRow && (
                     <tr>
                       <td style={{
-                        background: BG, position: "sticky", left: 0, zIndex: 10,
-                        padding: "0 8px 0 0", height: 32, verticalAlign: "middle",
+                        background: BASE, position: "sticky", left: 0, zIndex: 10,
+                        padding: "0 6px 0 0", height: 34, verticalAlign: "middle",
                       }}>
                         <div style={{
-                          display: "flex", alignItems: "center", gap: 6,
-                          height: "100%", paddingLeft: 10,
-                          borderLeft: `3px solid ${INDIGO}`,
+                          display: "flex", alignItems: "center", gap: 8,
+                          height: "100%", paddingLeft: 12,
+                          borderLeft: `2px solid ${VIOLET}`,
                         }}>
                           <input ref={addRowRef} data-testid="input-new-entity"
                             value={newEntityName}
@@ -797,25 +895,22 @@ export default function Home() {
                               if (e.key === "Enter") handleAddEntity();
                               if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
                             }}
-                            placeholder="Новый объект..."
-                            style={{ flex: 1, minWidth: 0, fontSize: 12, background: "transparent", outline: "none", border: "none", color: FG }}/>
+                            placeholder="Название объекта..."
+                            style={{ flex: 1, minWidth: 0, fontSize: 12, background: "transparent", outline: "none", border: "none", color: FG, letterSpacing: "-0.01em" }}/>
                           <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
-                            style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: INDIGO, color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.3 }}>
-                            ОК
+                            style={{ fontSize: 11, padding: "3px 10px", borderRadius: 7, background: VIOLET, color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.35, fontWeight: 600 }}>
+                            Добавить
                           </button>
                           <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
-                            style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: FG_DIM }}>
+                            style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: FG_DIM, marginRight: 4 }}>
                             <X style={{ width: 11, height: 11 }}/>
                           </button>
                         </div>
                       </td>
                       {days.map(day => (
                         <td key={format(day, "yyyy-MM-dd")}
-                          style={{
-                            background: isWeekend(day) ? CELL_WE : CELL_WD,
-                            borderRadius: 5, height: 32,
-                            borderLeft: day.getDay() === 1 ? `3px solid ${BG}` : undefined,
-                          }}/>
+                          className={isWeekend(day) ? "cell-weekend" : "cell-empty"}
+                          style={{ borderRadius: 5, height: 34, borderLeft: day.getDay() === 1 ? `4px solid ${BASE}` : undefined }}/>
                       ))}
                     </tr>
                   )}
@@ -823,7 +918,7 @@ export default function Home() {
               </table>
             </div>
 
-            {/* ── Timeline panel ── */}
+            {/* Timeline */}
             <HorizontalTimeline
               date={dayPanel}
               entities={entities}
@@ -834,7 +929,7 @@ export default function Home() {
             />
           </div>
 
-          {/* ── Finance panel ── */}
+          {/* Finance panel */}
           {showFinance && (
             <FinancePanel
               events={events}
@@ -997,32 +1092,41 @@ function EntityRow({
     setEditing(false);
   };
 
-  const BG_ROW    = "#070b14";
-  const BORDER_R  = "#161d2e";
-  const INDIGO_R  = "#6366f1";
-  const FG_R      = "rgba(226,232,240,0.88)";
-  const FG_DIM_R  = "rgba(226,232,240,0.35)";
-  const CELL_WD_R = "#111929";
-  const CELL_WE_R = "#0d1520";
-  const TODAY_COL_R = "rgba(99,102,241,0.07)";
+  const BASE_R   = "#030712";
+  const VIOLET_R = "#8b5cf6";
+  const GREEN_R  = "#10b981";
+  const AMBER_R  = "#f59e0b";
+  const FG_R     = "rgba(226,232,240,0.9)";
+  const FG_D_R   = "rgba(226,232,240,0.28)";
 
-  const STATUS_FILL: Record<string, string> = {
-    confirmed: "#0f3d22",
-    pending:   "#3d2500",
+  const CELL_CONF_BG  = "rgba(16,185,129,0.1)";
+  const CELL_PEND_BG  = "rgba(245,158,11,0.08)";
+  const CELL_DRAG_BG  = "rgba(139,92,246,0.2)";
+
+  const STATUS_TOP: Record<string, string> = {
+    confirmed: GREEN_R,
+    pending:   AMBER_R,
   };
 
   return (
-    <tr>
-      {/* Entity label — sticky */}
+    <tr className="entity-row">
+      {/* ── Entity name cell ── */}
       <td style={{
-        background: BG_ROW, position: "sticky", left: 0, zIndex: 10,
-        padding: "0 8px 0 0", height: 30, verticalAlign: "middle",
+        background: BASE_R, position: "sticky", left: 0, zIndex: 10,
+        padding: "0 6px 0 0", height: 34, verticalAlign: "middle",
       }}>
         <div style={{
-          display: "flex", alignItems: "center", gap: 8,
-          height: "100%", paddingLeft: 10,
-          borderLeft: `3px solid ${entity.color}`,
+          display: "flex", alignItems: "center", gap: 9,
+          height: "100%", padding: "0 0 0 10px",
         }}>
+          {/* Color square */}
+          <div style={{
+            width: 8, height: 22, borderRadius: 3,
+            background: entity.color,
+            boxShadow: `0 0 8px ${entity.color}55`,
+            flexShrink: 0,
+          }}/>
+
           {editing ? (
             <input ref={inputRef} value={editName}
               onChange={e => setEditName(e.target.value)}
@@ -1031,25 +1135,32 @@ function EntityRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
               }}
-              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: `1px solid ${INDIGO_R}`, color: FG_R, minWidth: 0 }}/>
+              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: `1px solid ${VIOLET_R}`, color: FG_R, minWidth: 0, letterSpacing: "-0.01em" }}/>
           ) : (
-            <span
+            <span className="entity-name"
               onDoubleClick={() => setEditing(true)}
               title={entity.name}
-              style={{ fontSize: 12, fontWeight: 500, color: "rgba(226,232,240,0.72)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, cursor: "default" }}>
+              style={{
+                fontSize: 12, fontWeight: 500,
+                color: "rgba(226,232,240,0.62)",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                flex: 1, cursor: "default", letterSpacing: "-0.01em",
+                transition: "color 0.15s",
+              }}>
               {entity.name}
             </span>
           )}
+
+          {/* Action buttons */}
           {!editing && (
-            <div style={{ display: "flex", gap: 2, opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "0"}>
+            <div className="entity-actions"
+              style={{ display: "flex", gap: 2, opacity: 0, transition: "opacity 0.15s", flexShrink: 0, marginRight: 2 }}>
               <button onClick={() => setEditing(true)} title="Переименовать"
-                style={{ width: 18, height: 18, border: "none", background: "rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, color: FG_DIM_R, transition: "background 0.1s" }}>
+                style={{ width: 20, height: 20, border: "none", background: "rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 5, color: FG_D_R }}>
                 <Pencil style={{ width: 9, height: 9 }}/>
               </button>
               <button onClick={() => onDeleteEntity(entity.id)} title="Удалить"
-                style={{ width: 18, height: 18, border: "none", background: "rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, color: FG_DIM_R, transition: "background 0.1s" }}>
+                style={{ width: 20, height: 20, border: "none", background: "rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 5, color: FG_D_R }}>
                 <Trash2 style={{ width: 9, height: 9 }}/>
               </button>
             </div>
@@ -1057,7 +1168,7 @@ function EntityRow({
         </div>
       </td>
 
-      {/* Day cells */}
+      {/* ── Day cells ── */}
       {days.map(day => {
         const dateStr = format(day, "yyyy-MM-dd");
         const cellEvents = getEventsForCell(entity.id, dateStr);
@@ -1066,27 +1177,46 @@ function EntityRow({
         const key  = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
         const firstEv = cellEvents[0];
-        const emptyBg = tod ? TODAY_COL_R : wknd ? CELL_WE_R : CELL_WD_R;
-        const filledBg = isDragTarget
-          ? "rgba(99,102,241,0.22)"
-          : firstEv
-            ? (STATUS_FILL[firstEv.status] ?? CELL_WD_R)
-            : emptyBg;
+
+        let cellClass = "cell-empty";
+        let cellBg: string | undefined;
+        let topBorder: string | undefined;
+        let topShadow: string | undefined;
+
+        if (isDragTarget) {
+          cellBg = CELL_DRAG_BG;
+          topBorder = VIOLET_R;
+        } else if (firstEv) {
+          const isConf = firstEv.status === "confirmed";
+          cellBg = isConf ? CELL_CONF_BG : CELL_PEND_BG;
+          topBorder = STATUS_TOP[firstEv.status];
+          topShadow = isConf
+            ? "inset 0 2px 0 rgba(16,185,129,0.5)"
+            : "inset 0 2px 0 rgba(245,158,11,0.45)";
+          cellClass = "";
+        } else if (tod) {
+          cellClass = "cell-today-empty";
+        } else if (wknd) {
+          cellClass = "cell-weekend";
+        }
+
         const isWeekStart = day.getDay() === 1;
 
         return (
           <td key={dateStr}
+            className={cellClass}
             style={{
-              background: filledBg,
-              borderRadius: 5,
+              ...(cellBg ? { background: cellBg } : {}),
+              borderRadius: 6,
               padding: 0,
-              height: 30,
+              height: 34,
               verticalAlign: "middle",
-              opacity: (firstEv?.done && !isDragTarget) ? 0.3 : 1,
-              transition: "background 0.1s, opacity 0.1s",
-              borderLeft: isWeekStart ? `3px solid ${BG_ROW}` : undefined,
+              opacity: (firstEv?.done && !isDragTarget) ? 0.28 : 1,
+              transition: "background 0.12s, opacity 0.12s",
+              borderLeft: isWeekStart ? `4px solid ${BASE_R}` : undefined,
               position: "relative",
-              outline: tod ? `1px solid rgba(99,102,241,0.18)` : undefined,
+              boxShadow: topShadow,
+              outline: tod ? "1px solid rgba(139,92,246,0.15)" : undefined,
               outlineOffset: "-1px",
             }}
             onDragOver={e => onDragOver(key, e)}
