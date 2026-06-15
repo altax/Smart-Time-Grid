@@ -127,13 +127,26 @@ export default function Home() {
     end:   endOfMonth(currentMonth),
   });
 
-  /* scroll to today */
+  /* today context */
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const isCurrentMonthView = isSameMonth(currentMonth, new Date());
+
+  /* for current month: only show today+future columns, plus past days that have shifts */
+  const pastDaysWithShifts = isCurrentMonthView
+    ? new Set(events.filter(e => e.date < todayStr).map(e => e.date))
+    : new Set<string>();
+  const filteredDays = isCurrentMonthView
+    ? days.filter(d => {
+        const dStr = format(d, "yyyy-MM-dd");
+        return dStr >= todayStr || pastDaysWithShifts.has(dStr);
+      })
+    : days;
+
+  /* scroll to far left (today is first full-width column in current month) */
   useEffect(() => {
     const id = requestAnimationFrame(() => {
-      if (todayThRef.current && gridRef.current) {
-        const g = gridRef.current;
-        const th = todayThRef.current;
-        g.scrollTo({ left: th.offsetLeft - g.clientWidth / 2 + th.offsetWidth / 2, behavior: "smooth" });
+      if (gridRef.current) {
+        gridRef.current.scrollTo({ left: 0, behavior: "smooth" });
       }
     });
     return () => cancelAnimationFrame(id);
@@ -222,8 +235,9 @@ export default function Home() {
   }, []);
   const handleDragEnd = useCallback(() => { activeDrag = null; setDragOverKey(null); }, []);
   const handleDragOver = useCallback((key: string, e: React.DragEvent) => {
+    e.preventDefault();
     if (activeRowDrag) return;
-    e.preventDefault(); setDragOverKey(key);
+    setDragOverKey(key);
   }, []);
   const handleDrop = useCallback((targetEntityId: string, targetDate: string) => {
     if (!activeDrag) return;
@@ -262,10 +276,6 @@ export default function Home() {
     setDraggingEntityId(null);
   }, []);
 
-  /* today + month context */
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-  const isCurrentMonthView = isSameMonth(currentMonth, new Date());
-
   /* stats */
   const upcomingN     = events.filter(e => e.status === "upcoming").length;
   const pastN         = events.filter(e => e.status === "past").length;
@@ -277,7 +287,7 @@ export default function Home() {
   const weekGroups = (() => {
     const groups: Date[][] = [];
     let cur: Date[] = [];
-    days.forEach(d => {
+    filteredDays.forEach(d => {
       if (d.getDay() === 1 && cur.length) { groups.push(cur); cur = []; }
       cur.push(d);
     });
@@ -778,7 +788,7 @@ export default function Home() {
             }}>
               <colgroup>
                 <col style={{ width: 220, minWidth: 200 }}/>
-                {days.map(d => {
+                {filteredDays.map(d => {
                   const dStr = format(d, "yyyy-MM-dd");
                   const isCompact = isCurrentMonthView && dStr < todayStr;
                   return <col key={d.toISOString()} style={isCompact ? { width: 16, minWidth: 16 } : {}}/>;
@@ -822,7 +832,7 @@ export default function Home() {
                 {/* Day labels row */}
                 <tr>
                   <th style={{ background: BASE, position: "sticky", left: 0, zIndex: 30, padding: "2px 10px 6px 12px" }}/>
-                  {days.map(day => {
+                  {filteredDays.map(day => {
                     const tod = isToday(day), wknd = isWeekend(day);
                     const dStr = format(day, "yyyy-MM-dd");
                     const isCompact = isCurrentMonthView && dStr < todayStr;
@@ -878,7 +888,7 @@ export default function Home() {
               <tbody>
                 {entities.length === 0 && (
                   <tr>
-                    <td colSpan={days.length + 1}
+                    <td colSpan={filteredDays.length + 1}
                       style={{ background: "transparent", padding: "80px 0", textAlign: "center" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
                         <div style={{
@@ -899,12 +909,12 @@ export default function Home() {
                   <React.Fragment key={entity.id}>
                     {rowDragOverId === entity.id && (
                       <tr className="drag-row-indicator">
-                        <td colSpan={days.length + 1}><div className="drag-row-indicator-line"/></td>
+                        <td colSpan={filteredDays.length + 1}><div className="drag-row-indicator-line"/></td>
                       </tr>
                     )}
                     <EntityRow
                       entity={entity}
-                      days={days}
+                      days={filteredDays}
                       eventCount={getEventCountForEntity(entity.id)}
                       getEventsForCell={getEventsForCell}
                       dragOverKey={dragOverKey}
@@ -1286,7 +1296,10 @@ function EntityRow({
       <td style={{
         background: BASE_R, position: "sticky", left: 0, zIndex: 10,
         padding: "0 6px 0 0", height: 44, verticalAlign: "middle",
-      }}>
+      }}
+        onDragOver={e => { if (activeRowDrag) { e.preventDefault(); onRowDragOver(entity.id); } }}
+        onDrop={e => { if (activeRowDrag) { e.preventDefault(); onRowDrop(entity.id); } }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 9, height: "100%", padding: "0 0 0 6px" }}>
           {/* Drag handle */}
           <div
@@ -1369,8 +1382,11 @@ function EntityRow({
               style={{
                 padding: 0, height: 44, verticalAlign: "middle",
                 borderLeft: isWeekStart ? `4px solid ${BASE_R}` : undefined,
-              }}>
-              {pillColor && (
+              }}
+              onDragOver={e => { if (activeRowDrag) { e.preventDefault(); onRowDragOver(entity.id); } }}
+              onDrop={e => { if (activeRowDrag) { e.preventDefault(); onRowDrop(entity.id); } }}
+            >
+              {pillColor ? (
                 <div
                   onClick={e => {
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1391,6 +1407,23 @@ function EntityRow({
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.transform = "scaleY(1.1)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.75"; (e.currentTarget as HTMLElement).style.transform = "scaleY(1)"; }}
                   />
+                </div>
+              ) : (
+                <div
+                  onClick={e => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    onCellClick(entity.id, dateStr, rect);
+                  }}
+                  title={`Добавить смену за ${dateStr}`}
+                  style={{
+                    width: "100%", height: "100%", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    opacity: 0, transition: "opacity 0.15s",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0"; }}
+                >
+                  <div style={{ width: 3, height: 16, borderRadius: 2, background: FG_D_R }}/>
                 </div>
               )}
             </td>
@@ -1424,9 +1457,15 @@ function EntityRow({
               borderLeft: isWeekStart ? `4px solid ${BASE_R}` : leftBorderColor ? `3px solid ${leftBorderColor}55` : undefined,
               position: "relative",
             }}
-            onDragOver={e => onDragOver(key, e)}
-            onDragLeave={() => {}}
-            onDrop={e => { e.preventDefault(); onDrop(entity.id, dateStr); }}>
+            onDragOver={e => {
+              if (activeRowDrag) { e.preventDefault(); onRowDragOver(entity.id); return; }
+              onDragOver(key, e);
+            }}
+            onDrop={e => {
+              e.preventDefault();
+              if (activeRowDrag) { onRowDrop(entity.id); return; }
+              onDrop(entity.id, dateStr);
+            }}>
             <GridCell
               events={cellEvents}
               entityId={entity.id}
@@ -1643,20 +1682,17 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: {
   onClose: () => void;
   onAdd: (ev: PlannerEvent) => void;
 }) {
-  const [title,    setTitle]    = useState("");
-  const [status,   setStatus]   = useState<EventStatus>("upcoming");
-  const [notes,    setNotes]    = useState("");
-  const [earnings, setEarnings] = useState<string>("");
+  const [title,        setTitle]       = useState("");
+  const [status,       setStatus]      = useState<EventStatus>("upcoming");
+  const [notes,        setNotes]       = useState("");
+  const [earnings,     setEarnings]    = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState(date);
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => { titleRef.current?.focus(); }, []);
 
-  const dateLabel = (() => {
-    try { return format(parseISO(date), "d MMMM yyyy", { locale: ru }); } catch { return date; }
-  })();
-
   const submit = () => {
     onAdd({
-      id: genId(), entityId, date, status,
+      id: genId(), entityId, date: selectedDate, status,
       title:    title.trim() || undefined,
       notes:    notes.trim() || undefined,
       earnings: earnings ? parseFloat(earnings) : undefined,
@@ -1670,7 +1706,6 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: {
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm font-semibold text-foreground">Новая смена</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{dateLabel}</p>
           </div>
           <button onClick={onClose} className="w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent">
             <X className="w-3.5 h-3.5"/>
@@ -1678,6 +1713,17 @@ function AddEventPopup({ entityId, date, onClose, onAdd }: {
         </div>
 
         <div className="space-y-2.5">
+          {/* Date picker */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/40 border border-border/60">
+            <CalendarDays className="w-3 h-3 text-muted-foreground flex-shrink-0"/>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              className="flex-1 text-xs font-medium text-foreground bg-transparent outline-none border-none cursor-pointer min-w-0"/>
+          </div>
+
           {/* Fixed time */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/40 border border-border/60">
             <Clock className="w-3 h-3 text-muted-foreground flex-shrink-0"/>
