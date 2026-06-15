@@ -6,7 +6,7 @@ const router = Router();
 
 /* ── Entities ── */
 router.get("/entities", async (_req, res) => {
-  const rows = await db.select().from(plannerEntitiesTable).orderBy(plannerEntitiesTable.createdAt);
+  const rows = await db.select().from(plannerEntitiesTable).orderBy(plannerEntitiesTable.sortOrder, plannerEntitiesTable.createdAt);
   res.json(rows);
 });
 
@@ -17,10 +17,11 @@ router.post("/entities", async (req, res) => {
 });
 
 router.patch("/entities/:id", async (req, res) => {
-  const { name, color } = req.body as { name?: string; color?: string };
-  const updates: Partial<{ name: string; color: string }> = {};
-  if (name !== undefined) updates.name = name;
-  if (color !== undefined) updates.color = color;
+  const { name, color, sortOrder } = req.body as { name?: string; color?: string; sortOrder?: number };
+  const updates: Partial<{ name: string; color: string; sortOrder: number }> = {};
+  if (name      !== undefined) updates.name      = name;
+  if (color     !== undefined) updates.color     = color;
+  if (sortOrder !== undefined) updates.sortOrder = sortOrder;
   const [row] = await db.update(plannerEntitiesTable).set(updates).where(eq(plannerEntitiesTable.id, req.params.id)).returning();
   res.json(row);
 });

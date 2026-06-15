@@ -62,6 +62,18 @@ export function usePlanner() {
     catch (e) { console.error(e); }
   }, []);
 
+  const reorderEntities = useCallback(async (orderedIds: string[]) => {
+    setEntities(prev => {
+      const map = new Map(prev.map(e => [e.id, e]));
+      return orderedIds.map((id, i) => ({ ...map.get(id)!, sortOrder: i }));
+    });
+    try {
+      await Promise.all(orderedIds.map((id, i) =>
+        apiFetch(`/entities/${id}`, { method: "PATCH", body: JSON.stringify({ sortOrder: i }) })
+      ));
+    } catch (e) { console.error(e); }
+  }, []);
+
   /* ── Events ── */
   const addEvent = useCallback(async (ev: PlannerEvent) => {
     setEvents(prev => [...prev, ev]);
@@ -128,7 +140,7 @@ export function usePlanner() {
 
   return {
     entities, events, goals, expenses, loading,
-    addEntity, deleteEntity, renameEntity,
+    addEntity, deleteEntity, renameEntity, reorderEntities,
     addEvent, updateEvent, deleteEvent, moveEvent,
     getEventsForCell, getEventCountForEntity, getAllEventsForDay,
     addGoal, updateGoal, deleteGoal,

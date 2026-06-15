@@ -12,6 +12,7 @@ import {
   Copy, CalendarDays,
   Wallet, Target, ChevronDown, ChevronUp,
   ArrowUpRight, ArrowDownRight, Trophy, Receipt,
+  GripVertical, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { usePlanner } from "../hooks/use-planner";
 import {
@@ -62,6 +63,7 @@ const MONTH_NAMES = [
 
 /* Module-level drag + clipboard state */
 let activeDrag: { eventId: string; srcEntityId: string; srcDate: string } | null = null;
+let activeRowDrag: { entityId: string } | null = null;
 let hoveredPasteTarget: { entityId: string; date: string } | null = null;
 let hoveredEventForCopy: PlannerEvent | null = null;
 
@@ -76,7 +78,7 @@ export default function Home() {
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const {
     entities, events, goals, expenses, loading,
-    addEntity, deleteEntity, renameEntity,
+    addEntity, deleteEntity, renameEntity, reorderEntities,
     addEvent, updateEvent, deleteEvent, moveEvent,
     getEventsForCell, getEventCountForEntity, getAllEventsForDay,
     addGoal, updateGoal, deleteGoal,
@@ -96,8 +98,15 @@ export default function Home() {
   const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
 
   /* sidebar sections */
+  const [sidebarOpen,   setSidebarOpen]   = useState(true);
+  const [showUpcoming,  setShowUpcoming]  = useState(true);
   const [showGoals,    setShowGoals]    = useState(true);
   const [showExpenses, setShowExpenses] = useState(true);
+
+  /* row drag for reordering entities */
+  const [rowDragOverId, setRowDragOverId] = useState<string | null>(null);
+  const entitiesRef = useRef(entities);
+  useEffect(() => { entitiesRef.current = entities; }, [entities]);
 
   /* add expense form */
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -211,7 +220,10 @@ export default function Home() {
     activeDrag = { eventId, srcEntityId, srcDate };
   }, []);
   const handleDragEnd = useCallback(() => { activeDrag = null; setDragOverKey(null); }, []);
-  const handleDragOver = useCallback((key: string, e: React.DragEvent) => { e.preventDefault(); setDragOverKey(key); }, []);
+  const handleDragOver = useCallback((key: string, e: React.DragEvent) => {
+    if (activeRowDrag) return;
+    e.preventDefault(); setDragOverKey(key);
+  }, []);
   const handleDrop = useCallback((targetEntityId: string, targetDate: string) => {
     if (!activeDrag) return;
     if (activeDrag.srcEntityId !== targetEntityId || activeDrag.srcDate !== targetDate) {
@@ -219,6 +231,33 @@ export default function Home() {
     }
     activeDrag = null; setDragOverKey(null);
   }, [moveEvent]);
+
+  /* row drag handlers for entity reordering */
+  const handleRowDragStart = useCallback((entityId: string) => {
+    activeRowDrag = { entityId };
+  }, []);
+  const handleRowDragOver = useCallback((entityId: string) => {
+    if (!activeRowDrag || activeRowDrag.entityId === entityId) return;
+    setRowDragOverId(entityId);
+  }, []);
+  const handleRowDrop = useCallback((targetEntityId: string) => {
+    if (!activeRowDrag) return;
+    const srcId = activeRowDrag.entityId;
+    activeRowDrag = null;
+    setRowDragOverId(null);
+    if (srcId === targetEntityId) return;
+    const arr = [...entitiesRef.current];
+    const srcIdx = arr.findIndex(e => e.id === srcId);
+    const tgtIdx = arr.findIndex(e => e.id === targetEntityId);
+    if (srcIdx === -1 || tgtIdx === -1) return;
+    const [item] = arr.splice(srcIdx, 1);
+    arr.splice(tgtIdx, 0, item);
+    reorderEntities(arr.map(e => e.id));
+  }, [reorderEntities]);
+  const handleRowDragEnd = useCallback(() => {
+    activeRowDrag = null;
+    setRowDragOverId(null);
+  }, []);
 
   /* stats */
   const upcomingN     = events.filter(e => e.status === "upcoming").length;
@@ -294,12 +333,13 @@ export default function Home() {
 
       {/* ═══════════════ SIDEBAR ═══════════════ */}
       <aside style={{
-        width: 268, flexShrink: 0,
+        width: sidebarOpen ? 268 : 0, flexShrink: 0,
         background: PANEL,
-        borderRight: `1px solid ${BORDER}`,
+        borderRight: sidebarOpen ? `1px solid ${BORDER}` : "none",
         display: "flex", flexDirection: "column",
         overflow: "hidden",
         position: "relative",
+        transition: "width 0.2s ease",
       }}>
         {/* ── Header: brand + month nav ── */}
         <div style={{ padding: "16px 16px 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0, position: "relative" }}>
@@ -447,34 +487,43 @@ export default function Home() {
               .slice(0, 5);
             return (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-                  Ближайшие смены
-                </div>
-                {upcoming.length === 0
-                  ? <p style={{ fontSize: 11, color: FG_DIM }}>Нет запланированных смен</p>
-                  : upcoming.map(ev => {
-                    const d = parseISO(ev.date);
-                    const eName = entities.find(e => e.id === ev.entityId)?.name ?? "—";
-                    return (
-                      <div key={ev.id} style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "7px 0", borderBottom: `1px solid ${BORDER}`,
-                      }}>
-                        <div style={{ flexShrink: 0, minWidth: 32 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: FG, letterSpacing: "-0.03em", lineHeight: 1 }}>{format(d, "d")}</div>
-                          <div style={{ fontSize: 9, color: FG_DIM, marginTop: 2, textTransform: "uppercase" }}>{DAY_SHORT[d.getDay()]}</div>
+                <button
+                  onClick={() => setShowUpcoming(v => !v)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", padding: "0 0 8px 0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: FG_DIM, letterSpacing: "0.08em", textTransform: "uppercase" }}>Ближайшие смены</span>
+                    {upcoming.length > 0 && (
+                      <span style={{ fontSize: 9, fontWeight: 700, color: BLUE, background: `${BLUE}1a`, borderRadius: 99, padding: "1px 6px" }}>{upcoming.length}</span>
+                    )}
+                  </div>
+                  {showUpcoming ? <ChevronUp style={{ width: 10, height: 10, color: FG_DIM }}/> : <ChevronDown style={{ width: 10, height: 10, color: FG_DIM }}/>}
+                </button>
+                {showUpcoming && (
+                  upcoming.length === 0
+                    ? <p style={{ fontSize: 11, color: FG_DIM }}>Нет запланированных смен</p>
+                    : upcoming.map(ev => {
+                      const d = parseISO(ev.date);
+                      const eName = entities.find(e => e.id === ev.entityId)?.name ?? "—";
+                      return (
+                        <div key={ev.id} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "7px 0", borderBottom: `1px solid ${BORDER}`,
+                        }}>
+                          <div style={{ flexShrink: 0, minWidth: 32 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: FG, letterSpacing: "-0.03em", lineHeight: 1 }}>{format(d, "d")}</div>
+                            <div style={{ fontSize: 9, color: FG_DIM, marginTop: 2, textTransform: "uppercase" }}>{DAY_SHORT[d.getDay()]}</div>
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 12, color: FG_MED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{eName}</div>
+                            <div style={{ fontSize: 10, color: FG_DIM, marginTop: 1 }}>09:00 – 21:00</div>
+                          </div>
+                          {(ev.earnings ?? 0) > 0 && (
+                            <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, flexShrink: 0 }}>{fmtK(ev.earnings!)} ₽</div>
+                          )}
                         </div>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 12, color: FG_MED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{eName}</div>
-                          <div style={{ fontSize: 10, color: FG_DIM, marginTop: 1 }}>09:00 – 21:00</div>
-                        </div>
-                        {(ev.earnings ?? 0) > 0 && (
-                          <div style={{ fontSize: 10, fontWeight: 700, color: GREEN, flexShrink: 0 }}>{fmtK(ev.earnings!)} ₽</div>
-                        )}
-                      </div>
-                    );
-                  })
-                }
+                      );
+                    })
+                )}
               </div>
             );
           })()}
@@ -670,6 +719,21 @@ export default function Home() {
           background: PANEL,
           borderBottom: `1px solid ${BORDER}`,
         }}>
+          {/* Sidebar toggle */}
+          <button
+            onClick={() => setSidebarOpen(v => !v)}
+            title={sidebarOpen ? "Скрыть панель" : "Показать панель"}
+            style={{
+              width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center",
+              borderRadius: 7, border: `1px solid ${BORDER}`, background: "transparent",
+              cursor: "pointer", color: FG_DIM, flexShrink: 0, marginRight: 14,
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = FG; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = FG_DIM; }}>
+            {sidebarOpen
+              ? <PanelLeftClose style={{ width: 13, height: 13 }}/>
+              : <PanelLeftOpen  style={{ width: 13, height: 13 }}/>}
+          </button>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 18 }}>
             <span style={{ fontSize: 12, color: FG_MED }}>
               <span style={{ fontWeight: 700, color: FG }}>{entities.length}</span>{" "}
@@ -810,6 +874,7 @@ export default function Home() {
                     eventCount={getEventCountForEntity(entity.id)}
                     getEventsForCell={getEventsForCell}
                     dragOverKey={dragOverKey}
+                    rowDragOverId={rowDragOverId}
                     onCellClick={openAdd}
                     onEventClick={openView}
                     onContextMenu={openCtx}
@@ -826,6 +891,10 @@ export default function Home() {
                     onRenameEntity={renameEntity}
                     copiedEventId={copiedEvent?.id ?? null}
                     onCopyEvent={ev => { setCopiedEvent(ev); copiedEventRef.current = ev; }}
+                    onRowDragStart={handleRowDragStart}
+                    onRowDragOver={handleRowDragOver}
+                    onRowDrop={handleRowDrop}
+                    onRowDragEnd={handleRowDragEnd}
                   />
                 ))}
               </tbody>
@@ -1063,6 +1132,7 @@ interface EntityRowProps {
   days: Date[];
   eventCount: number;
   dragOverKey: string | null;
+  rowDragOverId: string | null;
   getEventsForCell: (eId: string, date: string) => PlannerEvent[];
   onCellClick: (eId: string, date: string, rect: DOMRect) => void;
   onEventClick: (ev: PlannerEvent, rect: DOMRect) => void;
@@ -1077,13 +1147,18 @@ interface EntityRowProps {
   onRenameEntity: (id: string, name: string) => void;
   copiedEventId: string | null;
   onCopyEvent: (ev: PlannerEvent) => void;
+  onRowDragStart: (entityId: string) => void;
+  onRowDragOver: (entityId: string) => void;
+  onRowDrop: (entityId: string) => void;
+  onRowDragEnd: () => void;
 }
 
 function EntityRow({
-  entity, days, eventCount: _eventCount, dragOverKey,
+  entity, days, eventCount: _eventCount, dragOverKey, rowDragOverId,
   getEventsForCell, onCellClick, onEventClick, onContextMenu, onShiftClick, onMarkPast,
   onDragStart, onDragEnd, onDragOver, onDrop,
   onDeleteEntity, onRenameEntity, copiedEventId, onCopyEvent: _onCopyEvent,
+  onRowDragStart, onRowDragOver, onRowDrop, onRowDragEnd,
 }: EntityRowProps) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(entity.name);
@@ -1109,14 +1184,31 @@ function EntityRow({
   const CELL_PAST_BG     = "rgba(84,96,112,0.22)";
   const CELL_DRAG_BG     = "rgba(91,156,246,0.3)";
 
+  const isRowTarget = rowDragOverId === entity.id;
+
   return (
-    <tr className="entity-row">
+    <tr className="entity-row" style={{ borderTop: isRowTarget ? `2px solid ${BLUE_R}` : undefined }}>
       {/* ── Entity name cell ── */}
       <td style={{
         background: BASE_R, position: "sticky", left: 0, zIndex: 10,
         padding: "0 6px 0 0", height: 44, verticalAlign: "middle",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, height: "100%", padding: "0 0 0 10px" }}>
+      }}
+        onDragOver={e => { if (activeRowDrag) { e.preventDefault(); e.stopPropagation(); onRowDragOver(entity.id); } }}
+        onDrop={e => { if (e.dataTransfer.getData("entity-row")) { e.preventDefault(); e.stopPropagation(); onRowDrop(entity.id); } }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 9, height: "100%", padding: "0 0 0 6px" }}>
+          {/* Drag handle */}
+          <div
+            draggable
+            onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("entity-row", entity.id); e.dataTransfer.effectAllowed = "move"; onRowDragStart(entity.id); }}
+            onDragEnd={onRowDragEnd}
+            title="Перетащить для сортировки"
+            style={{ cursor: "grab", color: FG_D_R, display: "flex", alignItems: "center", flexShrink: 0, padding: "0 2px", opacity: 0.35 }}
+            className="row-grip"
+          >
+            <GripVertical style={{ width: 11, height: 11 }}/>
+          </div>
+
           <div style={{
             width: 4, height: 26, borderRadius: 2,
             background: entity.color,
@@ -1250,9 +1342,14 @@ function GridCell({
   const onCellEnter = () => { hoveredPasteTarget = { entityId, date }; };
   const onCellLeave = () => { if (hoveredPasteTarget?.entityId === entityId && hoveredPasteTarget?.date === date) hoveredPasteTarget = null; };
   const showCard = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHoverCard(true); };
-  const hideCard = () => { hoverTimer.current = setTimeout(() => setHoverCard(false), 80); };
+  const hideCard = () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); setHoverCard(false); };
 
   if (events.length === 0) {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    const isPastDay = date < todayStr;
+    if (isPastDay) {
+      return <div style={{ width: "100%", height: "100%", cursor: "default" }}/>;
+    }
     return (
       <div ref={ref}
         onMouseEnter={onCellEnter}

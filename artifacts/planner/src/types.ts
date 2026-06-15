@@ -4,6 +4,7 @@ export interface Entity {
   id: string;
   name: string;
   color: string;
+  sortOrder?: number;
 }
 
 export type EventIcon = "none" | "briefcase" | "star" | "car" | "food";
