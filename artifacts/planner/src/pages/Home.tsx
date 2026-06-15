@@ -704,7 +704,7 @@ export default function Home() {
               background: BASE, width: "100%",
             }}>
               <colgroup>
-                <col style={{ width: 220, minWidth: 180 }}/>
+                <col style={{ width: 160, minWidth: 140 }}/>
                 {days.map(d => <col key={d.toISOString()}/>)}
               </colgroup>
 
