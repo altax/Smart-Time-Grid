@@ -332,363 +332,527 @@ export default function Home() {
     return { position: "fixed", left, top, width: w, zIndex: 50 };
   }
 
-  const BG = "#0d1117";
-  const CELL_EMPTY_WD  = "#21262d";
-  const CELL_EMPTY_WE  = "#161b22";
-  const FILLED_COLORS: Record<string, string> = {
-    confirmed: "#1a7f37",
-    pending:   "#9e6a03",
-  };
+  /* ── Design tokens ── */
+  const BG          = "#070b14";
+  const SIDEBAR_BG  = "#0b0f1c";
+  const BORDER      = "#161d2e";
+  const FG          = "rgba(226,232,240,0.88)";
+  const FG_DIM      = "rgba(226,232,240,0.35)";
+  const CELL_WD     = "#111929";
+  const CELL_WE     = "#0d1520";
+  const CELL_CONF   = "#0f3d22";
+  const CELL_PEND   = "#3d2500";
+  const CELL_DRAG   = "rgba(99,102,241,0.22)";
+  const INDIGO      = "#6366f1";
+  const TODAY_COL   = "rgba(99,102,241,0.07)";
+  const DAY_SHORT   = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
 
   return (
-    <div className="flex text-foreground" style={{ backgroundColor: BG, height: "100vh", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: BG, color: FG, fontFamily: "Inter, sans-serif" }}>
 
-      {/* ─────────────── Sidebar ─────────────── */}
+      {/* ═══════════════ SIDEBAR ═══════════════ */}
       <aside style={{
-        width: 210, flexShrink: 0,
-        backgroundColor: "#161b22",
-        borderRight: "1px solid #21262d",
+        width: 248, flexShrink: 0,
+        background: SIDEBAR_BG,
+        borderRight: `1px solid ${BORDER}`,
         display: "flex", flexDirection: "column",
-        padding: "22px 0 16px",
-        overflowY: "auto",
-        scrollbarWidth: "thin",
-        scrollbarColor: "rgba(255,255,255,0.06) transparent",
+        overflow: "hidden",
       }}>
-        {/* App title */}
-        <div style={{ padding: "0 18px 22px" }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(230,237,243,0.55)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            Планировщик смен
-          </span>
-        </div>
+        {/* ── Brand + Month nav ── */}
+        <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          {/* App icon + title */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10,
+              background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, boxShadow: "0 0 16px rgba(99,102,241,0.3)",
+            }}>
+              <CalendarDays style={{ width: 15, height: 15, color: "#fff" }}/>
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "rgba(226,232,240,0.95)", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                Планировщик
+              </div>
+              <div style={{ fontSize: 10, color: FG_DIM, marginTop: 2, letterSpacing: "0.01em" }}>
+                смен и финансов
+              </div>
+            </div>
+          </div>
 
-        {/* Month nav */}
-        <div style={{ padding: "0 14px 22px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-            <button data-testid="btn-prev-month"
-              onClick={() => setCurrentMonth(m => subMonths(m, 1))}
-              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid #30363d", background: "transparent", cursor: "pointer", color: "rgba(230,237,243,0.4)", flexShrink: 0 }}>
-              <ChevronLeft className="w-3 h-3"/>
+          {/* Month nav pill */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 4,
+            background: "#0f1628", borderRadius: 10, border: `1px solid ${BORDER}`, padding: "4px 6px",
+          }}>
+            <button data-testid="btn-prev-month" onClick={() => setCurrentMonth(m => subMonths(m, 1))}
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0, transition: "background 0.15s" }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}>
+              <ChevronLeft style={{ width: 13, height: 13 }}/>
             </button>
-            <button data-testid="btn-today"
-              onClick={() => setCurrentMonth(new Date())}
-              style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "rgba(230,237,243,0.85)", background: "transparent", border: "none", cursor: "pointer", textAlign: "center", padding: 0 }}>
+            <button data-testid="btn-today" onClick={() => setCurrentMonth(new Date())}
+              style={{ flex: 1, fontSize: 13, fontWeight: 600, color: FG, background: "transparent", border: "none", cursor: "pointer", textAlign: "center", letterSpacing: "-0.01em" }}>
               {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
             </button>
-            <button data-testid="btn-next-month"
-              onClick={() => setCurrentMonth(m => addMonths(m, 1))}
-              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid #30363d", background: "transparent", cursor: "pointer", color: "rgba(230,237,243,0.4)", flexShrink: 0 }}>
-              <ChevronRight className="w-3 h-3"/>
+            <button data-testid="btn-next-month" onClick={() => setCurrentMonth(m => addMonths(m, 1))}
+              style={{ width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", color: FG_DIM, flexShrink: 0, transition: "background 0.15s" }}
+              onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)"}
+              onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.background = "transparent"}>
+              <ChevronRight style={{ width: 13, height: 13 }}/>
             </button>
           </div>
         </div>
 
-        {/* Divider */}
-        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 20px" }}/>
+        {/* ── Scrollable body ── */}
+        <div className="sidebar-scroll" style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
 
-        {/* Stats */}
-        {(() => {
-          const confirmed  = events.filter(e => e.status === "confirmed").length;
-          const pending    = events.filter(e => e.status === "pending").length;
-          const total      = events.length;
-          const totalEarn  = events.reduce((s, e) => s + (e.earnings ?? 0), 0);
-          return (
-            <div style={{ padding: "0 18px 20px" }}>
-              <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>Месяц</p>
-
-              {/* Big earnings figure */}
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: "rgba(230,237,243,0.85)", lineHeight: 1 }}>
-                  {totalEarn >= 1000
-                    ? `${(totalEarn / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} к₽`
-                    : `${totalEarn} ₽`}
-                </div>
-                <div style={{ fontSize: 10, color: "rgba(230,237,243,0.3)", marginTop: 3 }}>фонд оплаты труда</div>
+          {/* KPI bento */}
+          <div style={{ marginBottom: 14 }}>
+            {/* Earnings hero card */}
+            <div style={{
+              background: "linear-gradient(135deg, rgba(22,163,74,0.10) 0%, rgba(16,185,129,0.04) 100%)",
+              border: "1px solid rgba(22,163,74,0.18)",
+              borderRadius: 14, padding: "14px 16px", marginBottom: 8,
+            }}>
+              <div style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.3)", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 8 }}>
+                Фонд оплаты труда
               </div>
-
-              {/* Shift counts */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div style={{ background: "#0d1117", borderRadius: 6, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#3dd68c", lineHeight: 1 }}>{confirmed}</div>
-                  <div style={{ fontSize: 9, color: "rgba(230,237,243,0.3)", marginTop: 3 }}>подтверждено</div>
-                </div>
-                <div style={{ background: "#0d1117", borderRadius: 6, padding: "8px 10px" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#f59e0b", lineHeight: 1 }}>{pending}</div>
-                  <div style={{ fontSize: 9, color: "rgba(230,237,243,0.3)", marginTop: 3 }}>ожидание</div>
-                </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: "#4ade80", lineHeight: 1, letterSpacing: "-0.05em" }}>
+                {totalEarnings >= 1000
+                  ? `${(totalEarnings / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} к`
+                  : `${totalEarnings}`}
+                <span style={{ fontSize: 16, marginLeft: 3, fontWeight: 600 }}>₽</span>
               </div>
-
-              {total > 0 && (
+              {events.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  {/* Progress bar */}
-                  <div style={{ height: 3, borderRadius: 2, background: "#21262d", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.round((confirmed / total) * 100)}%`, background: "#1a7f37", borderRadius: 2, transition: "width 0.3s" }}/>
+                  <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%",
+                      width: `${Math.round((confirmedN / events.length) * 100)}%`,
+                      background: "linear-gradient(90deg, #16a34a, #4ade80)",
+                      borderRadius: 99, transition: "width 0.5s ease",
+                    }}/>
                   </div>
-                  <div style={{ fontSize: 9, color: "rgba(230,237,243,0.25)", marginTop: 4 }}>
-                    {Math.round((confirmed / total) * 100)}% подтверждено
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
+                    <span style={{ fontSize: 9, color: "rgba(226,232,240,0.25)" }}>{events.length} смен всего</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#4ade80" }}>{Math.round((confirmedN / events.length) * 100)}% ✓</span>
                   </div>
                 </div>
               )}
             </div>
-          );
-        })()}
 
-        {/* Divider */}
-        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
-
-        {/* Upcoming shifts */}
-        {(() => {
-          const todayStr = format(new Date(), "yyyy-MM-dd");
-          const upcoming = events
-            .filter(e => e.date >= todayStr && e.status === "pending")
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .slice(0, 3);
-          const entityName = (id: string) => entities.find(e => e.id === id)?.name ?? "—";
-          return (
-            <div style={{ padding: "0 18px 18px" }}>
-              <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Ближайшие смены</p>
-              {upcoming.length === 0 ? (
-                <p style={{ fontSize: 10, color: "rgba(230,237,243,0.2)" }}>Нет запланированных</p>
-              ) : upcoming.map(ev => {
-                const d = parseISO(ev.date);
-                return (
-                  <div key={ev.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                    <div style={{ flexShrink: 0, textAlign: "center", background: "#21262d", borderRadius: 5, padding: "3px 5px", minWidth: 28 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(230,237,243,0.8)", lineHeight: 1 }}>{format(d, "d")}</div>
-                      <div style={{ fontSize: 8, color: "rgba(230,237,243,0.3)", lineHeight: 1, marginTop: 1 }}>{["вс","пн","вт","ср","чт","пт","сб"][d.getDay()]}</div>
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 11, color: "rgba(230,237,243,0.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {entityName(ev.entityId)}
-                      </div>
-                      {ev.assignee && ev.assignee !== "—" && (
-                        <div style={{ fontSize: 10, color: "rgba(230,237,243,0.35)", marginTop: 1 }}>{ev.assignee}</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            {/* 2-col stat cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div style={{ background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.13)", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#4ade80", letterSpacing: "-0.05em", lineHeight: 1 }}>{confirmedN}</div>
+                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 5 }}>подтверждено</div>
+              </div>
+              <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.13)", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ fontSize: 24, fontWeight: 800, color: "#fbbf24", letterSpacing: "-0.05em", lineHeight: 1 }}>{pendingN}</div>
+                <div style={{ fontSize: 10, color: FG_DIM, marginTop: 5 }}>ожидание</div>
+              </div>
             </div>
-          );
-        })()}
+          </div>
 
-        {/* Divider */}
-        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
+          {/* Divider */}
+          <div style={{ height: 1, background: BORDER, margin: "2px 0 14px" }}/>
 
-        {/* Staff list */}
-        {(() => {
-          const map: Record<string, number> = {};
-          events.forEach(e => {
-            if (e.assignee && e.assignee !== "—") map[e.assignee] = (map[e.assignee] ?? 0) + 1;
-          });
-          const staff = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
-          const max = staff[0]?.[1] ?? 1;
-          return (
-            <div style={{ padding: "0 18px 18px" }}>
-              <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Сотрудники</p>
-              {staff.length === 0 ? (
-                <p style={{ fontSize: 10, color: "rgba(230,237,243,0.2)" }}>Нет данных</p>
-              ) : staff.map(([name, cnt]) => (
-                <div key={name} style={{ marginBottom: 7 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
-                    <span style={{ fontSize: 11, color: "rgba(230,237,243,0.6)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>{name}</span>
-                    <span style={{ fontSize: 10, color: "rgba(230,237,243,0.3)", flexShrink: 0, marginLeft: 4 }}>{cnt}</span>
+          {/* Upcoming shifts */}
+          {(() => {
+            const todayStr = format(new Date(), "yyyy-MM-dd");
+            const upcoming = events
+              .filter(e => e.date >= todayStr && e.status === "pending")
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .slice(0, 3);
+            const entityName = (id: string) => entities.find(e => e.id === id)?.name ?? "—";
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Ближайшие смены</p>
+                {upcoming.length === 0 ? (
+                  <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет запланированных</p>
+                ) : upcoming.map(ev => {
+                  const d = parseISO(ev.date);
+                  return (
+                    <div key={ev.id} style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 8 }}>
+                      <div style={{
+                        flexShrink: 0, textAlign: "center",
+                        background: "#111929", border: `1px solid ${BORDER}`,
+                        borderRadius: 8, padding: "4px 6px", minWidth: 32,
+                      }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: FG, lineHeight: 1 }}>{format(d, "d")}</div>
+                        <div style={{ fontSize: 8, color: FG_DIM, lineHeight: 1, marginTop: 2, textTransform: "uppercase" }}>
+                          {["вс","пн","вт","ср","чт","пт","сб"][d.getDay()]}
+                        </div>
+                      </div>
+                      <div style={{ minWidth: 0, paddingTop: 2 }}>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: "rgba(226,232,240,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {entityName(ev.entityId)}
+                        </div>
+                        {ev.assignee && ev.assignee !== "—" && (
+                          <div style={{ fontSize: 10, color: FG_DIM, marginTop: 2 }}>{ev.assignee}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: BORDER, margin: "2px 0 14px" }}/>
+
+          {/* Staff */}
+          {(() => {
+            const map: Record<string, number> = {};
+            events.forEach(e => {
+              if (e.assignee && e.assignee !== "—") map[e.assignee] = (map[e.assignee] ?? 0) + 1;
+            });
+            const staff = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const max = staff[0]?.[1] ?? 1;
+            return (
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Сотрудники</p>
+                {staff.length === 0 ? (
+                  <p style={{ fontSize: 11, color: "rgba(226,232,240,0.18)" }}>Нет данных</p>
+                ) : staff.map(([name, cnt]) => (
+                  <div key={name} style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontSize: 11, color: "rgba(226,232,240,0.65)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>{name}</span>
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, color: "#4ade80",
+                        background: "rgba(74,222,128,0.1)", borderRadius: 99,
+                        padding: "1px 6px", flexShrink: 0, marginLeft: 6,
+                      }}>{cnt}</span>
+                    </div>
+                    <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.05)" }}>
+                      <div style={{ height: "100%", width: `${(cnt / max) * 100}%`, background: "linear-gradient(90deg, #16a34a, #4ade80)", borderRadius: 99, transition: "width 0.3s" }}/>
+                    </div>
                   </div>
-                  <div style={{ height: 2, borderRadius: 1, background: "#21262d" }}>
-                    <div style={{ height: "100%", width: `${(cnt / max) * 100}%`, background: "#1a7f37", borderRadius: 1 }}/>
-                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: BORDER, margin: "2px 0 14px" }}/>
+
+          {/* Legend */}
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Статус</p>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[
+                { label: "Подтверждено", color: "#4ade80", bg: "rgba(74,222,128,0.08)", border: "rgba(74,222,128,0.2)" },
+                { label: "Ожидание",     color: "#fbbf24", bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.2)" },
+              ].map(({ label, color, bg, border }) => (
+                <div key={label} style={{ flex: 1, background: bg, border: `1px solid ${border}`, borderRadius: 8, padding: "7px 10px" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 3, background: color, marginBottom: 5 }}/>
+                  <div style={{ fontSize: 10, color: "rgba(226,232,240,0.55)", lineHeight: 1.3 }}>{label}</div>
                 </div>
               ))}
             </div>
-          );
-        })()}
-
-        {/* Divider */}
-        <div style={{ height: 1, backgroundColor: "#21262d", margin: "0 14px 18px" }}/>
-
-        {/* Legend */}
-        <div style={{ padding: "0 18px" }}>
-          <p style={{ fontSize: 9, fontWeight: 600, color: "rgba(230,237,243,0.25)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>Статус</p>
-          {[
-            { label: "Подтверждено", color: "#1a7f37" },
-            { label: "Ожидание",     color: "#9e6a03"  },
-          ].map(({ label, color }) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color, flexShrink: 0, display: "inline-block" }}/>
-              <span style={{ fontSize: 11, color: "rgba(230,237,243,0.5)" }}>{label}</span>
-            </div>
-          ))}
+          </div>
         </div>
 
-        {/* Spacer */}
-        <div style={{ flex: 1 }}/>
-
-        {/* Add entity button */}
-        <div style={{ padding: "0 14px" }}>
+        {/* ── Add entity button ── */}
+        <div style={{ padding: "12px 14px 14px", borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <button
             onClick={() => setShowAddRow(true)}
-            style={{ width: "100%", padding: "7px 12px", borderRadius: 6, backgroundColor: "#21262d", border: "1px solid #30363d", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, color: "rgba(230,237,243,0.55)", fontSize: 11, fontWeight: 500 }}>
-            <Plus style={{ width: 10, height: 10 }}/>
+            style={{
+              width: "100%", padding: "9px 14px", borderRadius: 10,
+              background: "transparent", border: `1px dashed ${BORDER}`,
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              gap: 8, color: FG_DIM, fontSize: 12, fontWeight: 500, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = INDIGO; (e.currentTarget as HTMLButtonElement).style.color = INDIGO; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = BORDER; (e.currentTarget as HTMLButtonElement).style.color = FG_DIM; }}>
+            <Plus style={{ width: 13, height: 13 }}/>
             Добавить объект
           </button>
         </div>
       </aside>
 
-      {/* ─────────────── Main area ─────────────── */}
+      {/* ═══════════════ MAIN ═══════════════ */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-        {/* ── Top free zone (future: panels, KPIs, day view) ── */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: 11, color: "rgba(230,237,243,0.07)", letterSpacing: "0.06em", textTransform: "uppercase", userSelect: "none" }}>
-            Область для будущих панелей
-          </span>
+        {/* ── Top bar ── */}
+        <div style={{
+          height: 50, flexShrink: 0,
+          borderBottom: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center",
+          padding: "0 20px", gap: 16,
+          background: SIDEBAR_BG,
+        }}>
+          <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 16 }}>
+            <span style={{ fontSize: 11, color: FG_DIM }}>
+              <span style={{ color: FG, fontWeight: 600 }}>{entities.length}</span> объект{entities.length === 1 ? "" : entities.length < 5 ? "а" : "ов"}
+            </span>
+            <span style={{ width: 1, height: 14, background: BORDER }}/>
+            <span style={{ fontSize: 11, color: FG_DIM }}>
+              <span style={{ color: "#4ade80", fontWeight: 600 }}>{confirmedN}</span> подтверждено
+            </span>
+            <span style={{ width: 1, height: 14, background: BORDER }}/>
+            <span style={{ fontSize: 11, color: FG_DIM }}>
+              <span style={{ color: "#fbbf24", fontWeight: 600 }}>{pendingN}</span> ожидание
+            </span>
+            {overdueN > 0 && (
+              <>
+                <span style={{ width: 1, height: 14, background: BORDER }}/>
+                <span style={{ fontSize: 11, color: FG_DIM }}>
+                  <span style={{ color: "#f87171", fontWeight: 600 }}>{overdueN}</span> просрочено
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Finance button */}
+          <button onClick={() => setShowFinance(v => !v)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 14px", borderRadius: 8,
+              border: `1px solid ${showFinance ? "rgba(167,139,250,0.4)" : BORDER}`,
+              background: showFinance ? "rgba(167,139,250,0.08)" : "transparent",
+              color: showFinance ? "#a78bfa" : FG_DIM,
+              cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all 0.2s",
+            }}>
+            <Wallet style={{ width: 13, height: 13 }}/>
+            Финансы
+          </button>
+
+          {/* Timeline toggle */}
+          <button onClick={() => setTlCollapsed(v => !v)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 14px", borderRadius: 8,
+              border: `1px solid ${!tlCollapsed ? "rgba(99,102,241,0.4)" : BORDER}`,
+              background: !tlCollapsed ? "rgba(99,102,241,0.08)" : "transparent",
+              color: !tlCollapsed ? INDIGO : FG_DIM,
+              cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all 0.2s",
+            }}>
+            <Clock style={{ width: 13, height: 13 }}/>
+            Таймлайн
+          </button>
         </div>
 
-        {/* ── Grid — full width, pinned to bottom ── */}
-        <div style={{ borderTop: "1px solid #21262d" }}/>
-      <div ref={gridRef} style={{ overflow: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.06) transparent" }}>
-        <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "4px", backgroundColor: BG, width: "100%" }}>
-          <colgroup>
-            <col style={{ width: 190, minWidth: 190 }}/>
-            {days.map(d => <col key={d.toISOString()}/>)}
-          </colgroup>
+        {/* ── Grid + Finance panel ── */}
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-          <thead className="sticky top-0 z-20" style={{ backgroundColor: BG }}>
-            <tr>
-              {/* Entity column header */}
-              <th className="text-left align-middle pb-2" style={{ background: BG, position: "sticky", left: 0, zIndex: 30, paddingLeft: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(230,237,243,0.3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Объект</span>
-              </th>
-              {days.map(day => {
-                const tod = isToday(day), wknd = isWeekend(day);
-                const isWeekStart = day.getDay() === 1;
-                const DAY_SHORT = ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"];
-                return (
-                  <th key={day.toISOString()}
-                    ref={tod ? todayThRef : undefined}
-                    className="text-center"
-                    style={{
-                      background: "transparent",
-                      paddingBottom: 4,
-                      paddingTop: 0,
-                      paddingLeft: 0,
-                      borderLeft: isWeekStart ? "4px solid #0d1117" : undefined,
-                      verticalAlign: "bottom",
-                    }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-                      <span style={{
-                        fontSize: 7,
-                        fontWeight: 500,
-                        color: wknd ? "rgba(230,237,243,0.2)" : "rgba(230,237,243,0.28)",
-                        lineHeight: 1,
-                        letterSpacing: "0.02em",
-                      }}>
-                        {DAY_SHORT[day.getDay()]}
+          {/* ── Grid area ── */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+            {/* Scrollable grid */}
+            <div ref={gridRef} style={{ flex: 1, overflow: "auto", scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.07) transparent" }}>
+              <table style={{ tableLayout: "fixed", borderCollapse: "separate", borderSpacing: "3px", background: BG, minWidth: "100%" }}>
+                <colgroup>
+                  <col style={{ width: 204, minWidth: 204 }}/>
+                  {days.map(d => <col key={d.toISOString()} style={{ width: 30, minWidth: 30 }}/>)}
+                </colgroup>
+
+                <thead style={{ position: "sticky", top: 0, zIndex: 20, background: BG }}>
+                  {/* ── Week totals row ── */}
+                  <tr>
+                    <th style={{ background: BG, position: "sticky", left: 0, zIndex: 30, padding: "6px 8px 2px" }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: "rgba(226,232,240,0.22)", letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                        Объект
                       </span>
-                      <span
-                        className="flex items-center justify-center mx-auto rounded-sm leading-none"
-                        style={{
-                          fontSize: 9,
-                          fontWeight: tod ? 700 : 500,
-                          width: 18,
-                          height: 18,
-                          backgroundColor: tod ? "#238636" : "transparent",
-                          color: tod ? "#fff" : wknd ? "rgba(230,237,243,0.22)" : "rgba(230,237,243,0.45)",
-                        }}>
-                        {format(day, "d")}
-                      </span>
-                    </div>
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
+                    </th>
+                    {weekGroups.map((wDays, wi) => {
+                      const earn  = weekEarnings(wDays);
+                      const isFirstWeekStart = wi === 0 && wDays[0].getDay() !== 1;
+                      return (
+                        <th key={wi} colSpan={wDays.length}
+                          style={{
+                            background: BG,
+                            padding: "6px 0 2px",
+                            textAlign: "center",
+                            verticalAlign: "middle",
+                            borderLeft: wi > 0 || !isFirstWeekStart ? `3px solid ${BG}` : undefined,
+                          }}>
+                          {earn > 0 && (
+                            <span style={{
+                              display: "inline-flex", alignItems: "center", gap: 3,
+                              fontSize: 9, fontWeight: 600,
+                              color: "#4ade80",
+                              background: "rgba(74,222,128,0.08)",
+                              border: "1px solid rgba(74,222,128,0.14)",
+                              borderRadius: 99, padding: "1px 7px",
+                            }}>
+                              {earn >= 1000
+                                ? `${(earn / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })}к`
+                                : earn} ₽
+                            </span>
+                          )}
+                        </th>
+                      );
+                    })}
+                  </tr>
 
-            <tbody>
-              {entities.length === 0 && (
-                <tr>
-                  <td colSpan={days.length + 1}
-                    style={{ background: "transparent", borderRadius: 0, padding: "60px 0", textAlign: "center" }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>Нет данных</p>
-                      <button data-testid="btn-demo" onClick={loadDemoData}
-                        style={{ fontSize: 11, padding: "5px 14px", borderRadius: 6, backgroundColor: "rgba(240,96,96,0.14)", color: "#f06060", border: "none", cursor: "pointer" }}>
-                        Загрузить демо-данные
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
+                  {/* ── Day headers row ── */}
+                  <tr>
+                    <th style={{ background: BG, position: "sticky", left: 0, zIndex: 30, padding: "0 8px 6px" }}/>
+                    {days.map(day => {
+                      const tod = isToday(day), wknd = isWeekend(day);
+                      const isWeekStart = day.getDay() === 1;
+                      return (
+                        <th key={day.toISOString()}
+                          ref={tod ? todayThRef : undefined}
+                          style={{
+                            background: tod ? TODAY_COL : "transparent",
+                            padding: "0 0 6px",
+                            verticalAlign: "bottom",
+                            textAlign: "center",
+                            borderLeft: isWeekStart ? `3px solid ${BG}` : undefined,
+                          }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                            <span style={{
+                              fontSize: 8, fontWeight: 500,
+                              color: wknd ? "rgba(226,232,240,0.18)" : "rgba(226,232,240,0.3)",
+                              letterSpacing: "0.03em", textTransform: "uppercase",
+                              lineHeight: 1,
+                            }}>
+                              {DAY_SHORT[day.getDay()]}
+                            </span>
+                            <span style={{
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              width: 22, height: 22, borderRadius: 7,
+                              fontSize: 10,
+                              fontWeight: tod ? 800 : 500,
+                              background: tod ? INDIGO : "transparent",
+                              color: tod ? "#fff" : wknd ? "rgba(226,232,240,0.2)" : "rgba(226,232,240,0.55)",
+                              boxShadow: tod ? `0 0 10px rgba(99,102,241,0.5)` : "none",
+                              transition: "all 0.2s",
+                            }}>
+                              {format(day, "d")}
+                            </span>
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
 
-              {entities.map(entity => (
-                <EntityRow
-                  key={entity.id}
-                  entity={entity}
-                  days={days}
-                  eventCount={getEventCountForEntity(entity.id)}
-                  getEventsForCell={getEventsForCell}
-                  dragOverKey={dragOverKey}
-                  onCellClick={openAdd}
-                  onEventClick={openView}
-                  onContextMenu={openCtx}
-                  onShiftClick={ev => {
-                    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(ev.status) + 1) % STATUS_CYCLE.length];
-                    updateEvent({ ...ev, status: next });
-                  }}
-                  onDoneToggle={handleDoneToggle}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  onDeleteEntity={deleteEntity}
-                  onRenameEntity={renameEntity}
-                  copiedEventId={copiedEvent?.id ?? null}
-                  onCopyEvent={ev => { setCopiedEvent(ev); copiedEventRef.current = ev; }}
-                />
-              ))}
+                <tbody>
+                  {entities.length === 0 && (
+                    <tr>
+                      <td colSpan={days.length + 1}
+                        style={{ background: "transparent", padding: "72px 0", textAlign: "center" }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 48, height: 48, borderRadius: 14, background: "#111929", border: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <CalendarDays style={{ width: 22, height: 22, color: FG_DIM }}/>
+                          </div>
+                          <p style={{ fontSize: 13, color: "rgba(226,232,240,0.4)", fontWeight: 500 }}>Нет объектов</p>
+                          <button data-testid="btn-demo" onClick={loadDemoData}
+                            style={{ fontSize: 11, padding: "6px 16px", borderRadius: 8, background: "rgba(99,102,241,0.12)", color: INDIGO, border: `1px solid rgba(99,102,241,0.25)`, cursor: "pointer", fontWeight: 500 }}>
+                            Загрузить демо-данные
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
-              {/* ── Add entity row ── */}
-              {showAddRow ? (
-                <tr>
-                  {/* Input only in entity column */}
-                  <td style={{ background: BG, borderRadius: 0, padding: "3px 6px", height: "22px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <input ref={addRowRef} data-testid="input-new-entity"
-                        value={newEntityName}
-                        onChange={e => setNewEntityName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") handleAddEntity();
-                          if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
-                        }}
-                        placeholder="Новый объект..."
-                        style={{ flex: 1, minWidth: 0, fontSize: 11, background: "transparent", outline: "none", border: "none", color: "rgba(230,237,243,0.8)" }}/>
-                      <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
-                        style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, backgroundColor: "#238636", color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.3 }}>
-                        ОК
-                      </button>
-                      <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
-                        style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <X style={{ width: 9, height: 9, color: "rgba(230,237,243,0.3)" }}/>
-                      </button>
-                    </div>
-                  </td>
-                  {/* Empty tiles for day columns */}
-                  {days.map(day => (
-                    <td key={format(day, "yyyy-MM-dd")}
-                      style={{
-                        backgroundColor: isWeekend(day) ? CELL_EMPTY_WE : CELL_EMPTY_WD,
-                        borderRadius: "3px",
-                        height: "22px",
-                        width: "22px",
-                      }}/>
+                  {entities.map(entity => (
+                    <EntityRow
+                      key={entity.id}
+                      entity={entity}
+                      days={days}
+                      eventCount={getEventCountForEntity(entity.id)}
+                      getEventsForCell={getEventsForCell}
+                      dragOverKey={dragOverKey}
+                      onCellClick={openAdd}
+                      onEventClick={openView}
+                      onContextMenu={openCtx}
+                      onShiftClick={ev => {
+                        const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(ev.status) + 1) % STATUS_CYCLE.length];
+                        updateEvent({ ...ev, status: next });
+                      }}
+                      onDoneToggle={handleDoneToggle}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      onDeleteEntity={deleteEntity}
+                      onRenameEntity={renameEntity}
+                      copiedEventId={copiedEvent?.id ?? null}
+                      onCopyEvent={ev => { setCopiedEvent(ev); copiedEventRef.current = ev; }}
+                    />
                   ))}
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-      </div>{/* end gridRef / main scroll area */}
-      </div>{/* end main area */}
 
-      {/* ── Popup ── */}
+                  {/* ── Add entity inline row ── */}
+                  {showAddRow && (
+                    <tr>
+                      <td style={{
+                        background: BG, position: "sticky", left: 0, zIndex: 10,
+                        padding: "0 8px 0 0", height: 32, verticalAlign: "middle",
+                      }}>
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          height: "100%", paddingLeft: 10,
+                          borderLeft: `3px solid ${INDIGO}`,
+                        }}>
+                          <input ref={addRowRef} data-testid="input-new-entity"
+                            value={newEntityName}
+                            onChange={e => setNewEntityName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter") handleAddEntity();
+                              if (e.key === "Escape") { setNewEntityName(""); setShowAddRow(false); }
+                            }}
+                            placeholder="Новый объект..."
+                            style={{ flex: 1, minWidth: 0, fontSize: 12, background: "transparent", outline: "none", border: "none", color: FG }}/>
+                          <button onClick={handleAddEntity} disabled={!newEntityName.trim()}
+                            style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, background: INDIGO, color: "#fff", border: "none", cursor: "pointer", flexShrink: 0, opacity: newEntityName.trim() ? 1 : 0.3 }}>
+                            ОК
+                          </button>
+                          <button onClick={() => { setNewEntityName(""); setShowAddRow(false); }}
+                            style={{ background: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: FG_DIM }}>
+                            <X style={{ width: 11, height: 11 }}/>
+                          </button>
+                        </div>
+                      </td>
+                      {days.map(day => (
+                        <td key={format(day, "yyyy-MM-dd")}
+                          style={{
+                            background: isWeekend(day) ? CELL_WE : CELL_WD,
+                            borderRadius: 5, height: 32,
+                            borderLeft: day.getDay() === 1 ? `3px solid ${BG}` : undefined,
+                          }}/>
+                      ))}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Timeline panel ── */}
+            <HorizontalTimeline
+              date={dayPanel}
+              entities={entities}
+              getEventsForCell={getEventsForCell}
+              onDayReset={() => setDayPanel(format(new Date(), "yyyy-MM-dd"))}
+              collapsed={tlCollapsed}
+              onToggleCollapse={() => setTlCollapsed(v => !v)}
+            />
+          </div>
+
+          {/* ── Finance panel ── */}
+          {showFinance && (
+            <FinancePanel
+              events={events}
+              goals={goals}
+              totalEarnings={totalEarnings}
+              totalExpenses={totalExpenses}
+              thisWeekEarnings={thisWeekEarnings}
+              thisWeekExpenses={thisWeekExpenses}
+              onClose={() => setShowFinance(false)}
+              onAddGoal={addGoal}
+              onUpdateGoal={updateGoal}
+              onDeleteGoal={deleteGoal}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ═══ Popup ═══ */}
       {popup && (
         <div ref={popupRef} style={popupStyle(popup.anchor)}>
           {popup.mode === "add" && (
@@ -709,7 +873,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ── Context menu ── */}
+      {/* ═══ Context menu ═══ */}
       {ctxMenu && (
         <div ref={ctxRef}
           style={{ position:"fixed", left:ctxMenu.x, top:ctxMenu.y, zIndex:60 }}
@@ -719,7 +883,6 @@ export default function Home() {
             <p className="text-[11px] font-semibold text-foreground truncate">{ctxMenu.event.title}</p>
             <p className="text-[10px] text-muted-foreground">{ctxMenu.event.date}</p>
           </div>
-          {/* Done toggle */}
           <button
             onClick={() => { handleDoneToggle(ctxMenu.event); setCtxMenu(null); }}
             className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-accent transition-colors text-left">
@@ -834,12 +997,32 @@ function EntityRow({
     setEditing(false);
   };
 
+  const BG_ROW    = "#070b14";
+  const BORDER_R  = "#161d2e";
+  const INDIGO_R  = "#6366f1";
+  const FG_R      = "rgba(226,232,240,0.88)";
+  const FG_DIM_R  = "rgba(226,232,240,0.35)";
+  const CELL_WD_R = "#111929";
+  const CELL_WE_R = "#0d1520";
+  const TODAY_COL_R = "rgba(99,102,241,0.07)";
+
+  const STATUS_FILL: Record<string, string> = {
+    confirmed: "#0f3d22",
+    pending:   "#3d2500",
+  };
+
   return (
     <tr>
-      {/* Entity name — sticky left column */}
-      <td style={{ background: "#0d1117", borderRadius: 0, padding: "0 8px 0 4px", height: "22px", verticalAlign: "middle", position: "sticky", left: 0, zIndex: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: entity.color, flexShrink: 0, display: "inline-block", opacity: 0.75 }}/>
+      {/* Entity label — sticky */}
+      <td style={{
+        background: BG_ROW, position: "sticky", left: 0, zIndex: 10,
+        padding: "0 8px 0 0", height: 30, verticalAlign: "middle",
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 8,
+          height: "100%", paddingLeft: 10,
+          borderLeft: `3px solid ${entity.color}`,
+        }}>
           {editing ? (
             <input ref={inputRef} value={editName}
               onChange={e => setEditName(e.target.value)}
@@ -848,61 +1031,63 @@ function EntityRow({
                 if (e.key === "Enter") commit();
                 if (e.key === "Escape") { setEditName(entity.name); setEditing(false); }
               }}
-              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: "1px solid #238636", color: "rgba(230,237,243,0.9)", minWidth: 0 }}/>
+              style={{ flex: 1, fontSize: 12, background: "transparent", outline: "none", borderBottom: `1px solid ${INDIGO_R}`, color: FG_R, minWidth: 0 }}/>
           ) : (
             <span
               onDoubleClick={() => setEditing(true)}
               title={entity.name}
-              style={{ fontSize: 12, fontWeight: 400, color: "rgba(230,237,243,0.7)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, cursor: "default", letterSpacing: "0.01em" }}>
+              style={{ fontSize: 12, fontWeight: 500, color: "rgba(226,232,240,0.72)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, cursor: "default" }}>
               {entity.name}
             </span>
           )}
           {!editing && (
-            <div style={{ display: "flex", gap: 1, opacity: 0, transition: "opacity 0.12s" }}
+            <div style={{ display: "flex", gap: 2, opacity: 0, transition: "opacity 0.15s", flexShrink: 0 }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.opacity = "1"}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.opacity = "0"}>
               <button onClick={() => setEditing(true)} title="Переименовать"
-                style={{ width: 14, height: 14, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2, color: "rgba(230,237,243,0.35)" }}>
-                <Pencil style={{ width: 8, height: 8 }}/>
+                style={{ width: 18, height: 18, border: "none", background: "rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, color: FG_DIM_R, transition: "background 0.1s" }}>
+                <Pencil style={{ width: 9, height: 9 }}/>
               </button>
               <button onClick={() => onDeleteEntity(entity.id)} title="Удалить"
-                style={{ width: 14, height: 14, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 2, color: "rgba(230,237,243,0.35)" }}>
-                <Trash2 style={{ width: 8, height: 8 }}/>
+                style={{ width: 18, height: 18, border: "none", background: "rgba(255,255,255,0.05)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, color: FG_DIM_R, transition: "background 0.1s" }}>
+                <Trash2 style={{ width: 9, height: 9 }}/>
               </button>
             </div>
           )}
         </div>
       </td>
 
-      {/* Day cells — GitHub contribution squares */}
+      {/* Day cells */}
       {days.map(day => {
         const dateStr = format(day, "yyyy-MM-dd");
         const cellEvents = getEventsForCell(entity.id, dateStr);
         const wknd = isWeekend(day);
-        const key = `${entity.id}-${dateStr}`;
+        const tod  = isToday(day);
+        const key  = `${entity.id}-${dateStr}`;
         const isDragTarget = dragOverKey === key;
         const firstEv = cellEvents[0];
-        const emptyColor = wknd ? "#161b22" : "#21262d";
-        const STATUS_FILL: Record<string, string> = {
-          confirmed: "#1a7f37",
-          pending:   "#9e6a03",
-        };
-        const filledColor = isDragTarget
-          ? "rgba(35,134,54,0.35)"
-          : firstEv ? STATUS_FILL[firstEv.status] ?? "#21262d" : emptyColor;
+        const emptyBg = tod ? TODAY_COL_R : wknd ? CELL_WE_R : CELL_WD_R;
+        const filledBg = isDragTarget
+          ? "rgba(99,102,241,0.22)"
+          : firstEv
+            ? (STATUS_FILL[firstEv.status] ?? CELL_WD_R)
+            : emptyBg;
         const isWeekStart = day.getDay() === 1;
+
         return (
           <td key={dateStr}
             style={{
-              backgroundColor: filledColor,
-              borderRadius: "3px",
+              background: filledBg,
+              borderRadius: 5,
               padding: 0,
-              height: "22px",
+              height: 30,
               verticalAlign: "middle",
-              opacity: (firstEv?.done && !isDragTarget) ? 0.35 : 1,
-              transition: "background-color 0.08s, opacity 0.08s",
-              borderLeft: isWeekStart ? "4px solid #0d1117" : undefined,
+              opacity: (firstEv?.done && !isDragTarget) ? 0.3 : 1,
+              transition: "background 0.1s, opacity 0.1s",
+              borderLeft: isWeekStart ? `3px solid ${BG_ROW}` : undefined,
               position: "relative",
+              outline: tod ? `1px solid rgba(99,102,241,0.18)` : undefined,
+              outlineOffset: "-1px",
             }}
             onDragOver={e => onDragOver(key, e)}
             onDragLeave={() => {}}

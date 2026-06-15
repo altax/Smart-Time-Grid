@@ -45,72 +45,69 @@
 }
 
 :root {
-  /* The full-screen "card" background — also the gap color between tiles */
-  --background: 234 28% 14%;
-  --foreground: 220 12% 78%;
-  --border: 234 22% 22%;
-  --input: 234 22% 22%;
-  --ring: 0 68% 62%;
+  --background: 222 47% 6%;
+  --foreground: 215 20% 82%;
+  --border: 222 30% 14%;
+  --input: 222 30% 14%;
+  --ring: 248 72% 65%;
 
-  /* Popover / context menu — slightly lighter panel */
-  --card: 234 24% 17%;
-  --card-foreground: 220 12% 82%;
-  --card-border: 234 20% 24%;
+  --card: 222 40% 9%;
+  --card-foreground: 215 20% 84%;
+  --card-border: 222 28% 16%;
 
-  --popover: 234 26% 18%;
-  --popover-foreground: 220 12% 84%;
-  --popover-border: 234 20% 26%;
+  --popover: 222 42% 10%;
+  --popover-foreground: 215 20% 86%;
+  --popover-border: 222 28% 18%;
 
-  /* Primary = coral red (matches today + overdue in reference) */
-  --primary: 0 68% 62%;
+  --primary: 248 72% 65%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 234 22% 19%;
-  --secondary-foreground: 220 10% 68%;
+  --secondary: 222 30% 12%;
+  --secondary-foreground: 215 16% 64%;
 
-  --muted: 234 26% 12%;
-  --muted-foreground: 220 8% 44%;
+  --muted: 222 40% 8%;
+  --muted-foreground: 215 12% 40%;
 
-  --accent: 234 24% 20%;
-  --accent-foreground: 220 12% 78%;
+  --accent: 222 32% 13%;
+  --accent-foreground: 215 20% 82%;
 
-  --destructive: 0 72% 51%;
+  --destructive: 0 72% 54%;
   --destructive-foreground: 0 0% 100%;
 
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.25rem;
+  --radius: 0.5rem;
 }
 
 .dark {
-  --background: 234 28% 14%;
-  --foreground: 220 12% 78%;
-  --border: 234 22% 22%;
-  --input: 234 22% 22%;
-  --ring: 0 68% 62%;
+  --background: 222 47% 6%;
+  --foreground: 215 20% 82%;
+  --border: 222 30% 14%;
+  --input: 222 30% 14%;
+  --ring: 248 72% 65%;
 
-  --card: 234 24% 17%;
-  --card-foreground: 220 12% 82%;
-  --card-border: 234 20% 24%;
+  --card: 222 40% 9%;
+  --card-foreground: 215 20% 84%;
+  --card-border: 222 28% 16%;
 
-  --popover: 234 26% 18%;
-  --popover-foreground: 220 12% 84%;
-  --popover-border: 234 20% 26%;
+  --popover: 222 42% 10%;
+  --popover-foreground: 215 20% 86%;
+  --popover-border: 222 28% 18%;
 
-  --primary: 0 68% 62%;
+  --primary: 248 72% 65%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 234 22% 19%;
-  --secondary-foreground: 220 10% 68%;
+  --secondary: 222 30% 12%;
+  --secondary-foreground: 215 16% 64%;
 
-  --muted: 234 26% 12%;
-  --muted-foreground: 220 8% 44%;
+  --muted: 222 40% 8%;
+  --muted-foreground: 215 12% 40%;
 
-  --accent: 234 24% 20%;
-  --accent-foreground: 220 12% 78%;
+  --accent: 222 32% 13%;
+  --accent-foreground: 215 20% 82%;
 
-  --destructive: 0 72% 51%;
+  --destructive: 0 72% 54%;
   --destructive-foreground: 0 0% 100%;
 }
 
@@ -119,8 +116,10 @@
   body { @apply font-sans antialiased bg-background text-foreground; }
 }
 
-/* The dark tile color for empty grid cells — hardcoded since it must be
-   distinctly darker than the table gap color (#1b1d2e) */
 .grid-tile-empty {
-  background-color: #111320;
+  background-color: #0e1525;
 }
+
+/* Hide scrollbar on sidebar */
+.sidebar-scroll::-webkit-scrollbar { display: none; }
+.sidebar-scroll { scrollbar-width: none; }
