@@ -757,7 +757,7 @@ export default function Home() {
         </div>
 
         {/* ── Grid ── */}
-        <div ref={gridRef} className="sb-thin" style={{ flex: 1, overflow: "auto" }}>
+        <div ref={gridRef} className="sb-thin" style={{ flex: 1, overflow: "auto", paddingRight: 20 }}>
           {loading ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: FG_DIM, fontSize: 13 }}>
               Загрузка…
@@ -768,7 +768,7 @@ export default function Home() {
               background: BASE, width: "100%",
             }}>
               <colgroup>
-                <col style={{ width: 170, minWidth: 150 }}/>
+                <col style={{ width: 220, minWidth: 200 }}/>
                 {days.map(d => <col key={d.toISOString()}/>)}
               </colgroup>
 
@@ -1203,10 +1203,12 @@ function EntityRow({
             onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("entity-row", entity.id); e.dataTransfer.effectAllowed = "move"; onRowDragStart(entity.id); }}
             onDragEnd={onRowDragEnd}
             title="Перетащить для сортировки"
-            style={{ cursor: "grab", color: FG_D_R, display: "flex", alignItems: "center", flexShrink: 0, padding: "0 2px", opacity: 0.35 }}
+            style={{ cursor: "grab", color: FG_D_R, display: "flex", alignItems: "center", flexShrink: 0, padding: "0 2px", opacity: 0.55, transition: "opacity 0.15s" }}
             className="row-grip"
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.55"; }}
           >
-            <GripVertical style={{ width: 11, height: 11 }}/>
+            <GripVertical style={{ width: 13, height: 13 }}/>
           </div>
 
           <div style={{
@@ -1231,8 +1233,8 @@ function EntityRow({
               style={{
                 fontSize: 12, fontWeight: 500,
                 color: "rgba(226,232,240,0.65)",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 flex: 1, cursor: "default", letterSpacing: "-0.01em",
+                wordBreak: "break-word", lineHeight: 1.3,
               }}>
               {entity.name}
             </span>
