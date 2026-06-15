@@ -4,6 +4,7 @@ export const plannerEntitiesTable = pgTable("planner_entities", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   color: text("color").notNull(),
+  sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
